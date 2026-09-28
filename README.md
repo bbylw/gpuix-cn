@@ -8,6 +8,8 @@
 
 > 本文是 [GPUIX 官方 README](https://github.com/remorses/gpuix/blob/main/README.md) 的中文版本，章节顺序与原仓库一致。示例与 API 以英文原文为准。
 
+![一个玻璃拟态仪表盘：GPUIX 绘制的窗口、卡片、日程与原生文本](./docs/images/mail-app.jpg)
+
 ## 快速开始
 
 ### 三行命令
@@ -416,6 +418,8 @@ HTTPS 支持位于原生 crate 中。这在 **Bun** 与 **hermes-node** 上可�
 > [!NOTE]
 > 那些 `bun --hot` 命令需要克隆本仓库并进行本地原生构建，单靠已发布的包无法运行。
 
+![GPUIX 的 todo 示例应用](./docs/images/todo-app.png)
+
 ### 下载独立构建
 
 或者从 [GitHub release](https://github.com/remorses/gpuix/releases) 下载一个独立的 **chat** 构建。无需安装 Bun 或 Rust。
@@ -466,6 +470,10 @@ Wasm 这半部分是**单例，绝不能重复求值**。`WebGpuixRenderer::init
 
 - 不要在入口文件中调用 `import.meta.hot.accept("./your-app", ...)`。Bun 哪怕在被导入模块已经自行接受（self-accepted）时，也会运行导入者的依赖接受回调，于是该回调会在一次成功的刷新之上再次挂载组件树，并丢弃所有 `useState`。
 - 把 `@gpuix/native` 的导入放在一个「永远不会成为 Refresh 边界、也绝不被显式接受」的模块里。
+
+![对话回合里的虚拟化 diff 与 GFM 表格](./docs/images/chat-diff.png)
+
+![同一帧里的 markdown、代码与虚拟化 diff](./docs/images/showcase.png)
 
 ## 架构
 
@@ -2214,6 +2222,8 @@ GPUIX 绘制的每一段文本都是**可选中、可复制的**，包括位于 
 </div>
 ```
 
+![跨 markdown 块被选中的文本](./docs/images/selection.png)
+
 ### 读取与响应选区
 
 ```tsx
@@ -2391,6 +2401,8 @@ listRef.current.scrollToItem(rowOfMatch(search.active))
 />
 ```
 
+![语法高亮的代码块](./docs/images/code.png)
+
 `style` 中的 `fontFamily`、`fontSize`、`fontWeight`、`lineHeight` 与 `color` 会覆盖主题。行高是固定的，因此仅靠 `fontSize` 会按主题的比例缩放该高度；传入 `lineHeight` 则可以精确设定。
 
 > [!IMPORTANT]
@@ -2433,6 +2445,8 @@ listRef.current.scrollToItem(rowOfMatch(search.active))
 />
 ```
 
+![带词级高亮的 unified diff](./docs/images/diff.png)
+
 ### `<markdown>`
 
 GitHub 风格 markdown：标题、列表、表格、块引用、围栏代码、删除线、任务列表，以及自动链接的裸 URL。
@@ -2440,6 +2454,8 @@ GitHub 风格 markdown：标题、列表、表格、块引用、围栏代码、�
 ```tsx
 <markdown source={readme} onLinkClick={(e) => open(e.value)} />
 ```
+
+![含标题、列表、表格与代码围栏的 markdown](./docs/images/markdown.png)
 
 ### 主题
 
@@ -2473,6 +2489,8 @@ GitHub 风格 markdown：标题、列表、表格、块引用、围栏代码、�
   }}
 />
 ```
+
+![仅调整 metrics 之后的同一批组件](./docs/images/metrics.png)
 
 当 `scroll` 开启时，`<diff>` 会从这些数字出发做虚拟化，而无需测量，因此改动 `diffLineHeight` 也会重新调整滚动模型的大小。
 
