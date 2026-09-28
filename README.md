@@ -75,7 +75,7 @@ bun --hot app.tsx
 |---|---|
 | 不想要示例应用，自己装依赖 | [从零开始构建](#从零开始构建) |
 | 看运行起来的应用长什么样 | [示例](#示例) |
-| 理解它为什么能跑起来 | [架构](#architecture) |
+| 理解它为什么能跑起来 | [架构](#架构) |
 | 打包成可分发的 App | [打包成带图标的 App](#打包成带图标的-app) |
 
 ## 从零开始构建
@@ -209,7 +209,7 @@ bun build --compile app.tsx --outfile dist/app.exe
 | 目标 | 页面 |
 |---|---|
 | 生成 `.app` / `.AppImage` / setup `.exe` | [打包成带图标的 App](#打包成带图标的-app) |
-| 让应用能自我更新 | [自动更新](#auto-update) |
+| 让应用能自我更新 | [自动更新](#自动更新) |
 
 ## 打包成带图标的 App
 
@@ -304,23 +304,17 @@ Packager 只构建**宿主**操作系统。请在 macOS、Linux 与 Windows 上�
 
 ### 加上自动更新
 
-签名只需执行一次，接下来就可以让应用自我更新。见[自动更新](#auto-update)。
+签名只需执行一次，接下来就可以让应用自我更新。见[自动更新](#自动更新)。
 
-## auto-update
-
----
-title: 自动更新
-description: 'checkUpdate 的端点约定、签名产物与命名规则，以及更新后为什么必须退出。'
-eyebrow: 打包与发布
----
+## 自动更新
 
 打包**不会**自动开启更新。运行中的应用会调用 `@gpuix/native` 上的 `checkUpdate`。HTTP 使用的是与 `<img>` 相同的 `reqwest_client`。不存在第二个原生插件。
 
-## 托管到 GitHub Releases
+### 托管到 GitHub Releases
 
 先创建 release。CI 会在每个操作系统上打包、签名，并上传 bundle 及其 `.sig`。应用会访问 `https://github.com/OWNER/REPO/releases/latest`。它会被重写为 `https://api.github.com/repos/OWNER/REPO/releases/latest`。更新器读取 `tag_name` 与 `assets`，然后 GET 同级的 `{name}.sig`。
 
-## 只需签名一次
+### 只需签名一次
 
 ```bash
 cargo packager signer generate
@@ -347,7 +341,7 @@ render(<App />)
 
 `https://github.com/OWNER/REPO` 是同一个端点。
 
-## 上传产物
+### 上传产物
 
 请自行创建 GitHub release，然后再打包并上传。`--clobber` 会在 CI 重试时替换某个 asset。不要上传 feed JSON。
 
@@ -382,13 +376,13 @@ gh release upload v0.1.0 \
 >
 > `downloadAndInstall()` 会替换已打包的文件。它**不会**自动重启。请在它返回后退出，否则下次启动用的还是旧应用。
 
-## 平台支持
+### 平台支持
 
 HTTPS 支持位于原生 crate 中。这在 **Bun** 与 **hermes-node** 上可用。它在浏览器的 wasm 构建中不存在。
 
 仓库必须是 **public** 的，否则 GitHub 的 API 会返回 404。可选：在 `api.github.com` 前放一层 Cloudflare 缓存。用的是同一份 GitHub JSON，并非自定义 schema。
 
-## 文件名约定
+### 文件名约定
 
 这些约定必须与 packager 的输出一致，否则更新器会找不到同级的 `.sig`：
 
@@ -473,13 +467,7 @@ Wasm 这半部分是**单例，绝不能重复求值**。`WebGpuixRenderer::init
 - 不要在入口文件中调用 `import.meta.hot.accept("./your-app", ...)`。Bun 哪怕在被导入模块已经自行接受（self-accepted）时，也会运行导入者的依赖接受回调，于是该回调会在一次成功的刷新之上再次挂载组件树，并丢弃所有 `useState`。
 - 把 `@gpuix/native` 的导入放在一个「永远不会成为 Refresh 边界、也绝不被显式接受」的模块里。
 
-## architecture
-
----
-title: 架构
-description: '三层数据流：JS 侧的 mutation 队列、Rust 侧的 RetainedTree，以及 GPUI 每帧的立即模式重建。'
-eyebrow: 核心概念
----
+## 架构
 
 GPUIX 通过一套**基于共享 mutation 的运行时**把 React 和 Solid 桥接到 GPUI。桌面应用使用 napi-rs；浏览器应用则通过 wasm-bindgen 加载同一个 Rust 渲染器。每个框架 adapter 都会把发生变化的元素收集成一次原子的 mutation 批次。Rust 将该批次应用到一棵 retained 元素树上，GPUI 每一帧都会读取这棵树。
 
@@ -523,7 +511,7 @@ GPUIX 通过一套**基于共享 mutation 的运行时**把 React 和 Solid 桥�
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 为什么这样可行
+### 为什么这样可行
 
 GPUI 是一个**立即模式（immediate-mode）**的 UI 框架 —— 它每一帧都会重建整个元素树。GPUIX 没有去对抗这一点，而是顺势而为：
 
@@ -535,7 +523,7 @@ GPUI 是一个**立即模式（immediate-mode）**的 UI 框架 —— 它每一
 
 换句话说：JS 侧维护的是一棵**保留树**（retained tree），GPUI 侧维护的是**立即模式**的每帧重建。昂贵的那部分（布局与绘制）留在 GPUI 里，昂贵但不必要的那部分（跨 FFI 的变更传输）被压到最小。
 
-## Mutation API
+### Mutation API
 
 JS 与 Rust 之间的 mutation 接口是同一个原子方法。桌面端使用 napi，浏览器端使用 wasm-bindgen：
 
@@ -545,11 +533,11 @@ type MutationHost = Pick<GpuixRenderer, 'applyBatch'>
 
 `createMutationQueue` 只需要它。窗口尺寸、焦点与选区使用更小的宿主类型（`WindowSizeHost`、`SelectionHost`）。`NativeRenderer` 就是 `MutationHost` 再加上这些方法，因此一个假的（fake）实现只需实现 `applyBatch` 即可。
 
-## 元素 ID 的分配
+### 元素 ID 的分配
 
 元素 ID 是 JS 端用递增计数器生成的普通数字。React 在并发渲染模式下可能会放弃某些工作，因此 GPUIX 会把新的宿主节点暂存在 JS 中，直到 React 在提交（commit）阶段把被接受的子树安置好。只有在那时，它的 mutation 才会被加入批次。`applyBatch()` 会以原子方式应用这次被接受的提交，并把 Rust 视图标记为「下一帧需要重绘（dirty）」。
 
-## 事件流
+### 事件流
 
 事件从 GPUI 经由桌面端的 `ThreadsafeFunction`（以及浏览器端的 wasm-bindgen 回调）回传到 React。
 
@@ -578,9 +566,9 @@ State update triggers re-render → reconciler sends mutations back to Rust
 事件处理器存放在 JS 侧的一个注册表中，以 `(elementId, eventType)` 为键。Rust 只知道某个元素**是否有**监听器（通过 `setEventListener`），而不知道闭包本身 —— 真正的处理器位于 JS 中。
 
 > [!NOTE]
-> 这个设计的直接后果是：GPUI **不会**像 DOM 那样让点击冒泡。命中测试在 GPUI 的绘制盒子列表上是扁平的，命中哪个就派发给哪个。相关注意事项见[支持的样式](#styling)与[无样式控件](#headless-controls)。
+> 这个设计的直接后果是：GPUI **不会**像 DOM 那样让点击冒泡。命中测试在 GPUI 的绘制盒子列表上是扁平的，命中哪个就派发给哪个。相关注意事项见[支持的样式](#支持的样式)与[无样式控件](#无样式控件)。
 
-## 两个框架的分工
+### 两个框架的分工
 
 React 与 Solid 共用同一套 ID、mutation 队列、事件路由、测试 API、自动化客户端、观察者以及文本搜索匹配器。它们各自框架相关的调度器与组件上下文则保留在各自的 adapter 包中。
 
@@ -666,7 +654,7 @@ await Bun.build({
 
 ### 两个框架共享什么
 
-React 与 Solid 共用同一套 ID、mutation 队列、事件路由、测试 API、自动化客户端、观察者以及文本搜索匹配器。它们各自框架相关的调度器与组件上下文则保留在各自的 adapter 包中。详见[架构](#architecture)与[支持的元素](#支持的元素)。
+React 与 Solid 共用同一套 ID、mutation 队列、事件路由、测试 API、自动化客户端、观察者以及文本搜索匹配器。它们各自框架相关的调度器与组件上下文则保留在各自的 adapter 包中。详见[架构](#架构)与[支持的元素](#支持的元素)。
 
 ## 构建 GPUIX 自身
 
@@ -705,7 +693,7 @@ cd ../../examples
 bun --hot counter.tsx
 ```
 
-更多开发流程见[开发 Rust 侧](#developing-rust)。
+更多开发流程见[开发 Rust 侧](#开发-rust-侧)。
 
 ## render() 与窗口选项
 
@@ -757,8 +745,8 @@ render(<App />, {
 | 选项 | 用途 |
 |---|---|
 | `onKeyDown` / `onKeyUp` | 窗口级键盘监听器，见[焦点与键盘导航](#渲染器键盘回调) |
-| `onSelectionChange` | 窗口级选区变更回调，见[文本选区](#text-selection) |
-| `debugFrameOverlay` | 帧时间叠加层，见[调试帧叠加层](#debug-overlay) |
+| `onSelectionChange` | 窗口级选区变更回调，见[文本选区](#文本选区) |
+| `debugFrameOverlay` | 帧时间叠加层，见[调试帧叠加层](#调试帧叠加层) |
 | `keyboardFocusDim` | 关闭「其余元素变暗」的默认焦点行为 |
 | `tabNavigation` | `false` 关闭 Tab 的默认焦点移动 |
 
@@ -872,7 +860,7 @@ await app.close()
 > [!TIP]
 > 在可以的时候，优先使用 `createTestRoot()`。它**完全不打开窗口**，因此没有任何东西能抢走焦点，键盘输入也能正常工作。当检查需要一个真实的窗口、真实的 GPU 绘制或真实的进程时，再退而使用 `launch()` 加 `focus: false`。
 
-完整的自动化 API 见[自动化](#automation)。
+完整的自动化 API 见[自动化](#自动化)。
 
 ## 窗口控制与文件选择器
 
@@ -955,13 +943,7 @@ flushSync(() => setSidebarOpen(true))
 
 当一个顺序相关的 bug 依赖于提交先落地时使用它：例如先卸载再重新挂载，或者先改变状态再喂入下一个事件。
 
-## debug-overlay
-
----
-title: 调试帧叠加层
-description: '叠加层显示的是绘制时间而非 FPS。三个模式、四项统计，以及性能回归测试怎么跑。'
-eyebrow: 窗口与渲染器
----
+## 调试帧叠加层
 
 GPUI 会在布局之后把帧时间统计绘制进窗口。这个叠加层并不是一个 React 元素 —— 一个 React 的 FPS 标签会每帧都更新，反而造成更多工作。
 
@@ -993,7 +975,7 @@ renderer.getDebugFrameOverlayStats()
 >
 > 叠加层显示的是**绘制时间**，而非 FPS。
 
-## 性能回归测试
+### 性能回归测试
 
 chat 示例为此提供了一个回归测试：[`examples/chat.perf.test.tsx`](https://github.com/remorses/gpuix/blob/main/examples/chat.perf.test.tsx)。它对挂载、滚轮绘制与侧边栏点击计时。它断言的是 p95，而非每一帧。
 
@@ -1051,21 +1033,15 @@ save .tsx  ►  bun re-evaluates the entry  ►  render() remounts React
 > [!NOTE]
 > 这是一次**重新挂载**，而非 React Refresh。要保留 hook 状态，需要 Bun 在 `--hot` 期间注入 `$RefreshReg$`。该 transform 仅存在于 `bun build --react-fast-refresh`。相关追踪见 [oven-sh/bun#40179](https://github.com/oven-sh/bun/issues/40179)。
 
-原生的 `.node` 改动仍然需要重新构建。参见[开发 Rust 侧](#developing-rust)。
+原生的 `.node` 改动仍然需要重新构建。参见[开发 Rust 侧](#开发-rust-侧)。
 
 浏览器 Web 示例的热重载路径不同：它走的是 React Fast Refresh，会保留 `useState`。见[示例](#浏览器中的热重载)。
 
-## animation
-
----
-title: 原生动画
-description: 'motion.div、AnimatePresence 退场与确定性帧捕获，附目标值与 timing 的取值表。'
-eyebrow: 组件
----
+## 原生动画
 
 使用 **`motion.div`** 可以从初始样式动画到目标样式。React 只发送一次目标。Rust 会计算中间值，并请求 GPUI 帧，直到过渡结束 —— **每一帧都不需要一次 React 渲染或 N-API 调用**。
 
-## 动画化一个目标
+### 动画化一个目标
 
 ```tsx
 import { motion } from '@gpuix/react'
@@ -1086,7 +1062,7 @@ function WelcomeCard() {
 
 当元素必须以它的第一个 `animate` 目标挂载时，设置 **`initial={false}`**。后续的 `animate` 变化仍会正常过渡。如果目标在动画进行中发生了改变，下一次过渡会从当前可见的值开始，因此反向播放动画时不会发生跳变。
 
-## 目标与计时
+### 目标与计时
 
 Motion 目前接受以下**数值目标**：
 
@@ -1108,7 +1084,7 @@ Motion 目前接受以下**数值目标**：
 > [!NOTE]
 > 弹簧（springs）、关键帧（keyframes）、变体（variants）与共享布局动画目前尚不可用。
 
-## 动画化侧边栏
+### 动画化侧边栏
 
 动画化一个**外层裁剪容器**，并让内层侧边栏保持固定宽度。这样可以在不每帧重排其文本的情况下显示或隐藏内容。
 
@@ -1150,7 +1126,7 @@ function SidebarFrame({
 
 **chat 示例** 使用的就是这种模式。侧边栏在外层宽度于 `253` 到 `0` 像素之间移动时始终保持挂载。
 
-## 动画化卸载
+### 动画化卸载
 
 带有 **`exit`** 的 `motion.div` 只有在目标完成后才会离开，并且仅当它作为 **`AnimatePresence`** 的子元素时如此。若没有 `AnimatePresence`，React 会在同一次提交中销毁该节点。
 
@@ -1196,9 +1172,9 @@ function DeferredRemoval() {
 
 `motion.div` 接受 **`onMotionComplete`**。它在当前原生目标落定时运行。如果 React 在较早的完成到达 JavaScript 之前改变了目标，那个过期的完成会被忽略。
 
-## 捕获精确的帧
+### 捕获精确的帧
 
-[自动化 API](#automation) 可以冻结原生 motion 时钟并渲染特定的时间戳。这避免了定时器 sleep，并让 CI 在每次运行中都得到相同的帧。
+[自动化 API](#自动化) 可以冻结原生 motion 时钟并渲染特定的时间戳。这避免了定时器 sleep，并让 CI 在每次运行中都得到相同的帧。
 
 ```tsx
 import { connectTest } from '@gpuix/react/automation'
@@ -1225,17 +1201,11 @@ await app.clock.resume()
 
 `motion.div` 只需要一个数值目标。弹簧、关键帧与共享布局动画仍在计划中；带 `exit` 的退场过渡与确定性帧捕获已经可用。
 
-## scrolling
-
----
-title: 滚动
-description: 'overflow: scroll 容器获得原生滚动物理。哪些约束最容易踩坑，以及如何让多个窗格逐像素同步。'
-eyebrow: 组件
----
+## 滚动
 
 带有 `overflow: "scroll"` 的容器会变成原生可滚动的。GPUI 会自动处理滚动物理、裁剪与偏移保持。
 
-普通的滚动容器仍然会构建每一个子元素。当集合可能变得很大时，请使用 [`<virtual-list>`](#virtual-list)。
+普通的滚动容器仍然会构建每一个子元素。当集合可能变得很大时，请使用 [`<virtual-list>`](#虚拟列表)。
 
 > [!IMPORTANT]
 > **不支持嵌套滚动**
@@ -1267,7 +1237,7 @@ function Expandable({
 }
 ```
 
-## 基本滚动容器
+### 基本滚动容器
 
 ```tsx
 function ScrollableList() {
@@ -1297,7 +1267,7 @@ flex 列会把它的子元素拉伸到交叉轴，因此一个双轴容器需要
 </div>
 ```
 
-## 必须一起移动的面板
+### 必须一起移动的面板
 
 原生滚动容器无法驱动**冻结表头**。GPUI 在滚轮那一帧移动容器，而要移动表头的 JavaScript 回调会晚一帧才到达，因此快速平移时表头会被撕裂开。
 
@@ -1318,7 +1288,7 @@ function Pane({ offsetX, children }: { offsetX: number; children: React.ReactNod
 
 把正在移动的子树放在一个 `memo` 组件中，其 props 在平移过程中保持不变。这样滚轮只会带来少量的样式 mutation，而不是每行一个。[timeline 示例](https://github.com/remorses/gpuix/blob/main/examples/timeline.tsx) 就对一个标尺、一条轨道列以及一个片段网格做了这样的处理。
 
-## 编程式滚动
+### 编程式滚动
 
 请使用宿主 ref。`scrollIntoView()` 会向上找到最近的滚动父元素。在你已经持有一个 id 时，`scrollTo` 和 `scrollToItem` 仍然存在于 renderer 上。
 
@@ -1348,13 +1318,7 @@ renderer.scrollIntoView(elementId)        // 最近的滚动父元素
 renderer.getScrollOffset(elementId)       // 返回 [x, y] 或 null
 ```
 
-## virtual-list
-
----
-title: 虚拟列表
-description: '可变行高、聊天尾部跟随、滚动锚定，以及为什么裁剪比 memo 更重要。'
-eyebrow: 组件
----
+## 虚拟列表
 
 将 `<virtual-list>` 用于**长且高度可变的集合**，例如消息列表。React 与 Rust 会保留每一行，但 GPUI 只构建、布局并绘制靠近视口的那些行。
 
@@ -1384,7 +1348,7 @@ function MessageList({ messages }: { messages: Message[] }) {
 | `overdraw` | `512` | 在视口之外额外构建的像素 |
 | `estimatedItemHeight` | 无 | 未测量行的高度提示。配合 `itemCount` 时**必填** |
 
-## 虚拟化是如何工作的
+### 虚拟化是如何工作的
 
 **React 协调（reconciliation）保持正常。** 完整的带 key 子元素列表会跨越 mutation 协议，并保留在 Rust 的 retained 树中。GPUIX 只把昂贵的 GPUI 元素构建、布局与绘制工作推迟。
 
@@ -1404,7 +1368,7 @@ React Fiber + Rust RetainedTree    all row IDs, props, text, and events
        GPUI layout and paint      visible rows only
 ```
 
-## 行高
+### 行高
 
 **行不需要等高，你也不必知道它们的高度。** GPUI 会在某一行进入视口时测量它。`estimatedItemHeight` 是**对尚未被测量的行的提示**，而非一份尺寸契约。
 
@@ -1426,7 +1390,7 @@ index:     0        1        2        3        4        5        6        7
 
 在 children 模式下，`estimatedItemHeight` 是可选的 —— 此时每一行都存在且可被测量。配合 `itemCount` 时它**是必填的**，因为 React 永远不会挂载窗口之外的行，原生层也就没有可测量的元素。那些索引在 React 挂载真实行之前，会渲染成一个具有估计高度的空盒子。
 
-## 行的边界
+### 行的边界
 
 每一个**直接宿主子元素**就是一行虚拟行。给每一行一个稳定的 React key 和一个宿主根节点：
 
@@ -1440,12 +1404,12 @@ index:     0        1        2        3        4        5        6        7
 </virtual-list>
 ```
 
-一行里可以包含嵌套的 `<div>`、`<text>`、`<markdown>`、`<code>`、`<diff>`、`<input>` 与 `<textarea>` 元素。可聚焦的行在移出屏幕后仍然保持活跃，因此键盘输入与原生编辑器状态都会被保留。这些子元素自身不能滚动。嵌套滚动不受支持；参见[滚动](#scrolling)。
+一行里可以包含嵌套的 `<div>`、`<text>`、`<markdown>`、`<code>`、`<diff>`、`<input>` 与 `<textarea>` 元素。可聚焦的行在移出屏幕后仍然保持活跃，因此键盘输入与原生编辑器状态都会被保留。这些子元素自身不能滚动。嵌套滚动不受支持；参见[滚动](#滚动)。
 
 > [!NOTE]
 > `<virtual-list>` 不接受 `testId`、`hover` / `active` 样式，也不接受 `onFileDrop`。请把这些放在包裹用的 `<div>` 上 —— gpui 的列表不是交互元素，没有可持有状态的交互身份，也无法记录边界盒子。
 
-## 聊天尾部行为
+### 聊天尾部行为
 
 组合 `alignment="bottom"` 与 `followTail` 用于聊天线程：
 
@@ -1464,7 +1428,7 @@ index:     0        1        2        3        4        5        6        7
 
 当用户处于底部时，列表会跟随新行。向上滚动会暂停尾部跟随；回到底部后会再次启用。一个正在流式输出的最后一行会随着内容增长而被重新测量。
 
-## 滚动锚定
+### 滚动锚定
 
 列表锚定在**行索引**上，而非像素偏移上。在 children 模式下，React 会按 key 进行协调，因此即使在前面插入内容，该索引仍然落在同一行上：屏幕上已有的行会保持在原处。浏览器的做法相同，并称之为滚动锚定（scroll anchoring）。
 
@@ -1482,7 +1446,7 @@ scrolled down                          pinned to the top
 
 这正是待办列表或信息流想要的行为：`setItems((current) => [fresh, ...current])` 会把新行放到屏幕上。而一个在用户阅读时加载更早分页的历史面板，则应该使用 `alignment="bottom"`，这样页面加载永远不会移动文本。
 
-### 使用 itemCount 时
+#### 使用 itemCount 时
 
 > [!IMPORTANT]
 > **修正工作由应用自己负责**
@@ -1492,7 +1456,7 @@ scrolled down                          pinned to the top
 >
 > 不要去改动处于 `0` 的 `windowStart`；列表在那儿被钉在顶部，新行应当可见。
 
-## 编程式滚动
+### 编程式滚动
 
 使用一个 ref 来调用与普通滚动容器相同的 renderer 滚动方法：
 
@@ -1535,7 +1499,7 @@ renderer.getListScrollTop(listId)  // [itemIndex, offsetInItemPx, viewportHeight
 
 虚拟列表的 `scrollToItem` 调用会在**下一帧的子元素拼接之后、下一次渲染时**生效，因此一个针对刚刚提交的子元素列表计算出来的索引永远不会被偏移两次。
 
-## 性能模型
+### 性能模型
 
 | 工作 | 普通滚动容器 | `<virtual-list>` children | `<virtual-list>` + `itemCount` |
 |---|---|---|---|
@@ -1547,7 +1511,7 @@ renderer.getListScrollTop(listId)  // [itemIndex, offsetInItemPx, viewportHeight
 
 children 形式仍然会创建每一个 React 子元素，因此一个一万行的 `turns.map` 挂载起来很慢。传入 `itemCount` 与 `windowStart`，并且只渲染那一个切片，才能同样把窗口挂载出来。拥有数百万行的集合仍然需要应用层的分页，或一个拥有数据的原生元素。
 
-## 保持滚动流畅
+### 保持滚动流畅
 
 滚轮事件会通知窗口视图。随后 GPUI 会重新构建**可见的**那些行，并由 Taffy 再次布局。绘制时间消耗在这些行上，而非列表的长度上。
 
@@ -1597,9 +1561,9 @@ function ChatApp() {
 
 宽子元素上的 `overflowX: "scroll"` 不能抢走垂直滚轮。GPUIX 在该路径上设置了 `restrict_scroll_to_axis`。原生的 `overflow_x_scroll()` 必须调用同一个方法。
 
-在滚动时打开 [`debugFrameOverlay: 'full'`](#debug-overlay)。叠加层显示的是**绘制时间**。`8.3 MS` 约等于 120 Hz。
+在滚动时打开 [`debugFrameOverlay: 'full'`](#调试帧叠加层)。叠加层显示的是**绘制时间**。`8.3 MS` 约等于 120 Hz。
 
-## 可平移表面必须裁剪
+### 可平移表面必须裁剪
 
 `<virtual-list>` 是唯一会做虚拟化的东西。一个由**你**自己掌握偏移的表面 —— 时间轴、节点图、地图 —— 会把它的子元素绝对定位，于是 GPUI 在每一帧都会构建并布局**每一个** retained 子元素。没有任何东西替你跳过它们。
 
@@ -1630,13 +1594,7 @@ timeline 示例在横跨 26 条轨道、共 3,259 个片段上测量了两者：
 > [!IMPORTANT]
 > 性能采样必须包含 `renderer.flush()`。否则你计时的只是 React 更新，而不包含随后发生的任何 GPUI 构建、布局与绘制。上面的「仅 `memo`」数字如果忘了这一点，看起来会像 **0.6 ms**。
 
-## text-input
-
----
-title: 文本输入
-description: '平台原生编辑器能力：光标、选区、IME、剪贴板与撤销重做，以及行高与内边距的尺寸规则。'
-eyebrow: 组件
----
+## 文本输入
 
 `<input>` 与 `<textarea>` 使用 GPUI 的平台输入处理器。它们支持原生的光标（caret）、文本选区、IME 组合、剪贴板操作、撤销/重做、字素安全的删除（grapheme-safe deletion）以及鼠标定位。
 
@@ -1660,7 +1618,7 @@ eyebrow: 组件
 
 `value` 的变化可以替换原生内容，但保持相同的 prop 值并不会像浏览器托管的输入框那样拒绝一次编辑。
 
-## 光标
+### 光标
 
 聚焦的光标在编辑期间保持实心，空闲时每 500ms 闪烁一次。在失焦或窗口处于非活跃状态时，它会停止调度重绘帧。可以通过共享的原生主题覆盖它的颜色：
 
@@ -1668,11 +1626,11 @@ eyebrow: 组件
 <input theme={{ caret: '#22c55e' }} />
 ```
 
-## 剪贴板
+### 剪贴板
 
 当剪贴板中没有文本时，`Cmd+V` 或 `Ctrl+V` 会继续触发 `onKeyDown`，而不是消失在编辑器内部。这样应用就可以自己处理只有图片、或只有文件的剪贴板。即便操作系统把文件路径作为兜底文本一并包含，被复制的文件也仍会传播。混合了文本与图片的剪贴板内容仍然会粘贴其文本部分。
 
-## 行高
+### 行高
 
 `style` 中的 **`fontSize` 与 `lineHeight`** 用于设定每一行的尺寸。若不提供 `lineHeight`，行会使用 GPUI 默认的 leading，因此更大的 `fontSize` 会让盒子变高。传入 `lineHeight` 以像素为单位设定行高。`minRows` 与 `maxRows` 会按该高度做倍数放大。显式的 `height` 仍然会覆盖两者。
 
@@ -1686,7 +1644,7 @@ eyebrow: 组件
 />
 ```
 
-## 搜索胶囊中的输入框
+### 搜索胶囊中的输入框
 
 `<input>` **默认没有内边距**，并且会把文本绘制在盒子的顶部。当给定了额外高度时，单行输入框会将其文本垂直居中。请在输入框的 style 上或一个父级包装容器上设置 `padding`。当输入框带有 `borderRadius` 时，文本会自动裁剪为圆角形状。
 
@@ -1712,19 +1670,13 @@ eyebrow: 组件
 ```
 
 > [!NOTE]
-> `minWidth: 0` 在这里是必需的：一个需要收缩的 flex 子项没有它就不会收缩到内容宽度以下。规则和 CSS 一致，参见[支持的样式](#styling)。
+> `minWidth: 0` 在这里是必需的：一个需要收缩的 flex 子项没有它就不会收缩到内容宽度以下。规则和 CSS 一致，参见[支持的样式](#支持的样式)。
 
-## 与键盘的关系
+### 与键盘的关系
 
-Tab 永远不会向 `<input>` 或 `<textarea>` 中输入一个 tab 字符，这与浏览器一致。一个想要输入 tab 的编辑器会调用 `preventDefault()` 并自行插入它。焦点与键盘派发的完整规则见[焦点与键盘导航](#focus-keyboard)。
+Tab 永远不会向 `<input>` 或 `<textarea>` 中输入一个 tab 字符，这与浏览器一致。一个想要输入 tab 的编辑器会调用 `preventDefault()` 并自行插入它。焦点与键盘派发的完整规则见[焦点与键盘导航](#焦点与键盘导航)。
 
-## accessibility
-
----
-title: 无障碍
-description: '属性映射、默认 role 表格，以及哪些 props 在浏览器渲染器中只是空操作。'
-eyebrow: 组件
----
+## 无障碍
 
 GPUI 通过 AccessKit 与 **macOS AX 树**、Windows UIA 以及 Linux AT-SPI 通信。GPUIX 把 React 的 props 映射到这套 API 上。一个节点只有在**同时**拥有 GPUI id（始终设置）和一个 **role** 时，才会进入这棵树。
 
@@ -1753,7 +1705,7 @@ GPUI 通过 AccessKit 与 **macOS AX 树**、Windows UIA 以及 Linux AT-SPI 通
 | `aria-valuetext` | 字符串取值 |
 | `aria-level` | 标题层级 |
 
-## 原生默认值
+### 原生默认值
 
 原生默认值意味着常见元素不会「沉默」：
 
@@ -1767,22 +1719,16 @@ GPUI 通过 AccessKit 与 **macOS AX 树**、Windows UIA 以及 Linux AT-SPI 通
 显式的 `role` 会覆盖这些默认值。
 
 > [!IMPORTANT]
-> **一个可点击的 `div` 在你设置 `role="button"` 之前不是按钮。** `onClick` 会注册 AccessKit 的 `Click`，因此 VoiceOver 的 Press 会触发同一个 JS `click` 处理器，但它仍然不会进入 Tab 顺序 —— 那需要 [`tabIndex`](#focus-keyboard) 或 `Button` 原语。
+> **一个可点击的 `div` 在你设置 `role="button"` 之前不是按钮。** `onClick` 会注册 AccessKit 的 `Click`，因此 VoiceOver 的 Press 会触发同一个 JS `click` 处理器，但它仍然不会进入 Tab 顺序 —— 那需要 [`tabIndex`](#焦点与键盘导航) 或 `Button` 原语。
 
 > [!NOTE]
 > 浏览器 / wasm 渲染器没有 AccessKit 适配器。这些 props 在那里是空操作（no-op）。
 
-## 与内置原语的关系
+### 与内置原语的关系
 
-`Button`、`Dialog.Trigger`、`Dialog.Close` 等[内置原语](#headless-controls)已经设置了正确的 role 与键盘行为，因此优先使用它们，而不是手写带 `role` 的 `div`。
+`Button`、`Dialog.Trigger`、`Dialog.Close` 等[内置原语](#无样式控件)已经设置了正确的 role 与键盘行为，因此优先使用它们，而不是手写带 `role` 的 `div`。
 
-## focus-keyboard
-
----
-title: 焦点与键盘导航
-description: 'tab 顺序、键盘事件的派发路径、默认动作的取消方式，以及命令式聚焦 API。'
-eyebrow: 组件
----
+## 焦点与键盘导航
 
 焦点是一个**原生 GPUI 概念**。GPUIX 会把稳定的 React 元素 ID 连接到持久的 `gpui::FocusHandle` 值上，因此焦点在 React 重新渲染后依然保留：
 
@@ -1818,7 +1764,7 @@ Retained element ID ► persistent gpui::FocusHandle ► keyboard/action dispatc
 | `tabIndex={-1}` | 被焦点遍历跳过，但可通过点击或 renderer API 获得焦点 |
 | `autoFocus` | 在它的原生焦点句柄被创建时获取一次焦点 |
 
-## 元素键盘回调
+### 元素键盘回调
 
 `onKeyDown` 会先为获得焦点的元素触发，然后沿着 GPUI 的焦点派发路径，为声明了 `onKeyDown` 的祖先元素触发。`onKeyUp` 在按键释放时沿着同样的路径触发。添加这两个回调中的任意一个都会创建该元素的原生焦点句柄。
 
@@ -1839,7 +1785,7 @@ Retained element ID ► persistent gpui::FocusHandle ► keyboard/action dispatc
 
 GPUI 会在原始键盘回调之前派发匹配的按键动作（key action）。如果一个动作消费了那个键，`onKeyDown` 就不会触发。
 
-## Tab 默认移动焦点
+### Tab 默认移动焦点
 
 **Tab** 与 **Shift+Tab** 会沿 tab 顺序移动焦点，就像浏览器一样。该默认行为在该按键的每一个 `onKeyDown` 处理器之后运行，因此任何处理器都可以取消它：
 
@@ -1878,7 +1824,7 @@ render(<App />, { tabNavigation: false })
 > [!NOTE]
 > GPUI 在 JavaScript 运行之前就完成了原生派发，因此这些调用改变的是 GPUIX 接下来的行为。它们无法阻止一个已经消费了该按键的 GPUI 动作。
 
-## 渲染器键盘回调
+### 渲染器键盘回调
 
 把 `onKeyDown` 或 `onKeyUp` 传给 `render()`，即可获得一个窗口级监听器。它会在元素回调之后、针对那些没有被任何 GPUI 动作消费的原始按键触发，并且位于 Tab 默认行为之前。它以 renderer 作为第二个参数：
 
@@ -1890,7 +1836,7 @@ render(<App />, {
 })
 ```
 
-## 命令式焦点
+### 命令式焦点
 
 `focusNext()` 与 `focusPrevious()` 直接映射到 GPUI 的 `window.focus_next()` 与 `window.focus_prev()`。`focusNextWithin(id)` / `focusPreviousWithin(id)` 在该子树内部包裹遍历。`getFocusedElementId()` 返回宿主 id，或 `null`。在 WebGPU 打开期间发出的浏览器焦点请求会被排队，并在首个焦点句柄存在之后应用。如果在那次渲染之前到达了多个请求，以最新的请求为准。
 
@@ -1908,7 +1854,7 @@ function focusButton() {
 
 添加 `onKeyDown`、`onKeyUp`、`onFocus` 或 `onBlur` 会创建一个持久的焦点句柄。当元素必须通过焦点遍历可达时，同样要加上 `tabIndex`。移除 `tabIndex` 会把该元素从那个顺序中删除。
 
-## 在自定义面板内捕获 Tab
+### 在自定义面板内捕获 Tab
 
 `Dialog.Popup` 已经做了这件事。对于你自己的面板，请阻止默认的 Tab，然后用 `focusNextWithin` / `focusPreviousWithin` 在其内部包裹遍历。
 
@@ -1926,17 +1872,11 @@ function onKeyDown(event: KeyEvent) {
 </div>
 ```
 
-## 焦点样式
+### 焦点样式
 
 GPUIX 的默认行为是：当某个控件拥有键盘焦点时，其余可聚焦元素变暗。你可以用 `focusVisible` 覆盖这一点，详见[支持的样式](#焦点样式)。
 
-## headless-controls
-
----
-title: 无样式控件
-description: 'Button、Select、Combobox、Tooltip、Dialog 的部件表、浮层绘制顺序与层栈规则。'
-eyebrow: 组件
----
+## 无样式控件
 
 内置的控件是**无样式的原语（primitive）**，而非一套固定的组件库。请像在 shadcn 中使用 Radix 原语那样使用它们：导入一个原语命名空间，在本地文件中包装并加上样式，然后在应用的各处导入这些本地组件。
 
@@ -1956,7 +1896,7 @@ eyebrow: 组件
 | `@gpuix/react/dialog` | `Root`、`Trigger`、`Portal`、`Backdrop`、`Popup`、`Title`、`Description`、`Close` |
 | `@gpuix/react/floating` | `FloatingLayer`、`renderSlot` |
 
-## 构建一个本地 Select
+### 构建一个本地 Select
 
 创建 `components/ui/select.tsx`。这是应用代码，因此无需等待 GPUIX 增加主题选项，就可以直接复制并修改它：
 
@@ -2070,7 +2010,7 @@ const models = [
 >
 > 子元素必须转发它的 ref 与宿主 props。`ComboboxItem` 支持同样的模式。
 
-## 为 Combobox 与 Tooltip 加样式
+### 为 Combobox 与 Tooltip 加样式
 
 也请从命名空间导入开始它们的本地文件：
 
@@ -2117,7 +2057,7 @@ Combobox 使用原生 input 来进行文本编辑、IME、剪贴板与焦点。�
 
 所有浮动内容都使用 GPUI 延迟的 `anchored()` 层，吸附在窗口内部，并遮挡其背后的控件。
 
-## 浮层菜单
+### 浮层菜单
 
 菜单、tooltip 与对话框必须使用 `SelectContent`、`ComboboxContent` 或 `<anchored deferred>`。它们会在后续的绘制 pass 中，绘制在 `<virtual-list>` 以及页面其余部分之上。
 
@@ -2153,7 +2093,7 @@ Combobox 使用原生 input 来进行文本编辑、IME、剪贴板与焦点。�
 
 `FloatingLayer` 会把统一的圆角与每个角的圆角复制到它的 anchored 表面上，因此圆角的 Select、Combobox 与 Tooltip 内容不会在它背后露出方角。它还会把 `visibility` 与 `opacity` 放在那个外层表面上，让兜底的填充跟随它们，而不会让嵌套的透明度相乘。`pointerEvents: "none"` 会禁用 anchored 遮挡层。背景、边框、阴影、溢出与布局仍然留在内层内容上，以避免重复绘制或改变弹层几何。
 
-## 测量一个元素
+### 测量一个元素
 
 `getElementBounds(id)` 返回最后一次绘制的盒子，如果该节点没有绘制则返回 `null`。它在实时的 `GpuixRenderer` 与测试渲染器上都可以工作。边界是在**绘制（paint）**期间记录的，因此应在某一帧之后读取，而不是在挂载的那次提交中读取。
 
@@ -2162,7 +2102,7 @@ const box = renderer.getElementBounds?.(ref.current.id)
 // { x, y, width, height }
 ```
 
-## Button
+### Button
 
 GPUIX 没有原生的 `<button>`，因此一个带 `onClick` 的 `div` 既无法用 Tab 到达，也会忽略键盘。`Button` 就是 [Base UI Button](https://base-ui.com/react/components/button)：
 
@@ -2185,7 +2125,7 @@ import { Button } from '@gpuix/react/button'
 
 `buttonProps(behavior)` 为你的自定义部件返回同样的 props。`Dialog.Trigger` 与 `Dialog.Close` 都构建在它之上。
 
-## Dialog
+### Dialog
 
 部件与 [Base UI Dialog](https://base-ui.com/react/components/dialog) 相同：
 
@@ -2234,7 +2174,7 @@ Popup 上的 `initialFocus` 与 `finalFocus` 决定焦点去向，就像 Base UI
 
 嵌套的对话框遵循层栈。当两者在一次更新中同时打开时，内部的那个获得焦点。当两者在一次更新中同时关闭时，焦点会回到外层对话框的返回目标。Popup 内部的 Select 或 Tooltip 会打开在它之上，并且 Escape 会先关闭它。
 
-## Escape 关闭顶层
+### Escape 关闭顶层
 
 每一个打开的 Dialog Popup、Select、Combobox 与 Tooltip 都位于每个窗口的同一个**层栈（layer stack）** 上。Escape 只关闭最近打开的那一层，即便没有任何元素获得焦点。它是一个默认动作，就像 Tab，因此任何 `onKeyDown` 都可以让它保持打开：
 
@@ -2262,13 +2202,7 @@ import { DismissableLayer } from '@gpuix/react' // 或 '@gpuix/solid'
 
 与框架无关的代码使用 `pushDismissLayer(renderer, layer, { previousFocus })`（带一个 `parent` 字段），并在该层关闭时调用返回的函数。
 
-## text-selection
-
----
-title: 文本选区
-description: '跨元素选区如何工作、如何读取与响应，以及如何用 userSelect 关掉不需要的地方。'
-eyebrow: 文本能力
----
+## 文本选区
 
 GPUIX 绘制的每一段文本都是**可选中、可复制的**，包括位于 `<code>`、`<diff>` 与 `<markdown>` 内部的文本。一次从标题开始、在围栏代码块内结束的拖拽，会选中它们之间的所有内容；Cmd+C 会按文档顺序把它们拼接后复制。
 
@@ -2280,7 +2214,7 @@ GPUIX 绘制的每一段文本都是**可选中、可复制的**，包括位于 
 </div>
 ```
 
-## 读取与响应选区
+### 读取与响应选区
 
 ```tsx
 render(<App />, {
@@ -2297,7 +2231,7 @@ renderer.clearSelection()
 
 载荷是一个普通的 `EventPayload`。`value` 是拼接后的选中文本。
 
-## 它是怎么工作的
+### 它是怎么工作的
 
 选区之所以能工作，是因为每一个被绘制的文本元素都会以**绘制顺序**（即文档顺序）注册进一个逐帧的注册表。一次锚定在某个元素中的拖拽会针对该注册表解析为逐元素的跨度：锚点与末端处是部分选中，中间的全部整段选中。
 
@@ -2309,15 +2243,9 @@ renderer.clearSelection()
 > [!IMPORTANT]
 > **userSelect: none 并不退出搜索**
 >
-> 浏览器仍然能找到那段文本，因此 GPUIX 仍然会高亮它。只有元素自身的装饰（chrome）、代码行号槽或 diff 文件头会被排除。详见[高亮与搜索](#highlight-search)。
+> 浏览器仍然能找到那段文本，因此 GPUIX 仍然会高亮它。只有元素自身的装饰（chrome）、代码行号槽或 diff 文件头会被排除。详见[高亮与搜索](#高亮与搜索)。
 
-## highlight-search
-
----
-title: 高亮与搜索
-description: 'highlight 属性、useTextSearch 查找栏、显式范围，以及虚拟列表下的计数责任。'
-eyebrow: 文本能力
----
+## 高亮与搜索
 
 **`highlight` 属性**会在匹配文本背后绘制一层背景色。把它放在任何元素上，就会作用于该元素的子树，因此放在根节点上会搜索整个窗口，而放在某个容器上则只搜索那个容器。
 
@@ -2329,7 +2257,7 @@ eyebrow: 文本能力
 
 它能触达 `<text>`、`<code>`、`<markdown>` 与 `<diff>` 而无需额外属性，因为 GPUIX 绘制的每一个字符串都会经过同一个漏斗。
 
-## 一个查找栏
+### 一个查找栏
 
 `useTextSearch` 负责光标与计数。`next` 与 `previous` 是普通的事件处理器，因此这里不需要任何 effect。
 
@@ -2357,7 +2285,7 @@ function Find() {
 }
 ```
 
-## 显式范围
+### 显式范围
 
 当你已经有了偏移量（来自 LSP 范围或你自己的模型）时，直接传入它们，而不是 query。它们是 **UTF-16 码元**下的 `[start, end)`，也就是 `indexOf` 与 `RegExp.exec` 返回的单位。
 
@@ -2370,7 +2298,7 @@ function Find() {
 > [!IMPORTANT]
 > 一对会拆分代理对（surrogate pair）的范围是**被拒绝**的，绝不会被吸附取整。范围只索引 retained 文本；原生元素在 Rust 中构建它们自己的字符串，因此那些情况请使用 `query`。
 
-## 选项
+### 选项
 
 | 字段 | 含义 |
 |---|---|
@@ -2385,7 +2313,7 @@ function Find() {
 
 传入一个**数组**可以一次性绘制多个，例如搜索匹配项加上一处常驻的提及着色。靠后的条目绘制在更上层。
 
-## 匹配规则
+### 匹配规则
 
 匹配之间**不重叠**，且从左往右取。不区分大小写用的是 Unicode **小写化**而非完整的大小写折叠，所以 `ﬀ` 不会匹配 `ff`。词边界是任何不属于 Unicode Alphabetic、数字或 `_` 的码点。
 
@@ -2400,7 +2328,7 @@ function Find() {
 
 最近的声明胜出，因此一个嵌套的 `highlight` 会为那个子树替换掉其祖先的声明。
 
-## 搜索一个虚拟列表
+### 搜索一个虚拟列表
 
 `<virtual-list>` 永远不会构建屏幕外的行，因此原生层只能看到已挂载的窗口。由此带来两点推论，并且两者都是应用的责任，因为行数据由应用掌握。
 
@@ -2433,24 +2361,18 @@ listRef.current.scrollToItem(rowOfMatch(search.active))
 
 `findRanges` 对**同一**字符串匹配原生的算法。请在原生层绘制的相同逻辑行上调用它：同一个父元素下相邻的文本节点算作一行，而 `<markdown>` 绘制的是内联片段（run）而非其源码。
 
-## 为什么是背景色块
+### 为什么是背景色块
 
-`HighlightStyle.background_color` 由 gpui 在原生层绘制，但只有方角，而且无法报告它绘制出的盒子。GPUIX 从 `range_rects`（与选区及行内代码药丸相同的辅助函数）绘制四边形，因此一个软换行后的匹配在每一视觉行上是一个盒子，`getPaintedHighlights()` 无需截图就能对几何做断言。Zed 自己的编辑器出于同样的原因也手动绘制搜索高亮。参见[测试](#testing)。
+`HighlightStyle.background_color` 由 gpui 在原生层绘制，但只有方角，而且无法报告它绘制出的盒子。GPUIX 从 `range_rects`（与选区及行内代码药丸相同的辅助函数）绘制四边形，因此一个软换行后的匹配在每一视觉行上是一个盒子，`getPaintedHighlights()` 无需截图就能对几何做断言。Zed 自己的编辑器出于同样的原因也手动绘制搜索高亮。参见[测试](#测试)。
 
 > [!NOTE]
 > `userSelect: "none"` 并不会退出搜索。浏览器仍然能找到那段文本，因此 GPUIX 仍然会高亮它。只有元素自身的装饰（chrome）、代码行号槽或 diff 文件头会被排除。
 
-## native-text
-
----
-title: 原生文本组件
-description: '三个在 Rust 侧完成排版与着色的元素，以及如何用 theme 重新调校而无需重新构建。'
-eyebrow: 组件
----
+## 原生文本组件
 
 有三个元素会使用在 Rust 中计算得到的 Syntect 语法高亮来渲染文本。颜色来自一个主题属性，因此晚到的高亮可以在不改变布局的前提下为各个片段重新着色。
 
-## `<code>`
+### `<code>`
 
 一个带语法高亮的代码块。每行一行、行高为精确值，因此在高亮运行之前，该块的高度就已经确定。
 
@@ -2491,13 +2413,13 @@ eyebrow: 组件
 
 `<markdown>` 不同：它保留自己那张围栏代码块卡片，因为文档渲染器掌握着自身的布局。可以用 `mdCode*` 这组度量值来微调那张卡片。
 
-## `<diff>`
+### `<diff>`
 
 一个统一格式（unified）的 diff 查看器。默认情况下它**随父元素流动**，因此父级列表可以是唯一的滚动器。折叠一个文件会移除它的行（而非隐藏它们），因此一个被折叠的一万行文件只占一行。
 
 用 `maxLines` 来让长补丁保持短小。「显示更多」会触发 `onShowMore`。在那个处理器里清空 `maxLines` 即可显示其余部分。
 
-只有当你需要一个专门的全窗口查看器时，才传入 `scroll` 与一个**有界高度**。那条路径使用 GPUI 的 `list()` 并做虚拟化。不要把它嵌套进另一个滚动器中。参见[滚动](#scrolling)。
+只有当你需要一个专门的全窗口查看器时，才传入 `scroll` 与一个**有界高度**。那条路径使用 GPUI 的 `list()` 并做虚拟化。不要把它嵌套进另一个滚动器中。参见[滚动](#滚动)。
 
 ```tsx
 <diff
@@ -2511,7 +2433,7 @@ eyebrow: 组件
 />
 ```
 
-## `<markdown>`
+### `<markdown>`
 
 GitHub 风格 markdown：标题、列表、表格、块引用、围栏代码、删除线、任务列表，以及自动链接的裸 URL。
 
@@ -2519,7 +2441,7 @@ GitHub 风格 markdown：标题、列表、表格、块引用、围栏代码、�
 <markdown source={readme} onLinkClick={(e) => open(e.value)} />
 ```
 
-## 主题
+### 主题
 
 这三个组件都接受同一个可选的 `theme` 属性。每一个字段都会叠加在内置的暗色主题之上，因此只覆盖其中一个 token，其余的仍保持原样。
 
@@ -2535,7 +2457,7 @@ GitHub 风格 markdown：标题、列表、表格、块引用、围栏代码、�
 />
 ```
 
-## 布局数字也住在主题里
+### 布局数字也住在主题里
 
 行高、行号槽宽度、内边距以及标题字号阶梯都位于 `metrics` 下，是属性而非 Rust 常量，因此调校设计只是一次 React 重新渲染，而绝不需要重新构建原生层。
 
@@ -2557,7 +2479,7 @@ GitHub 风格 markdown：标题、列表、表格、块引用、围栏代码、�
 > [!TIP]
 > **同样这三件事可以完全免去重新构建：** 修改 `patch` 或 `source`，下一帧就会显示。调整 `theme.metrics` 里的行高或标题字号只是一次 React 重渲染。
 
-## 内置语言
+### 内置语言
 
 Rust、TypeScript、TSX、JavaScript、JSX、Python、Go、JSON、Bash、TOML、YAML、Markdown、HTML、CSS、C。
 
@@ -2581,7 +2503,7 @@ Rust、TypeScript、TSX、JavaScript、JSX、Python、Go、JSON、Bash、TOML、
 ### 几处差异
 
 > [!IMPORTANT]
-> **GPUIX 没有 `<button>`。** 一个带 `onClick` 的 `div` 既无法用 Tab 到达，也会忽略键盘。内置的 [`Button` 原语](#headless-controls) 就是为此准备的：它基于 [Base UI Button](https://base-ui.com/react/components/button)，提供 tab 停靠点、`role="button"` 与 Enter / Space 行为。
+> **GPUIX 没有 `<button>`。** 一个带 `onClick` 的 `div` 既无法用 Tab 到达，也会忽略键盘。内置的 [`Button` 原语](#无样式控件) 就是为此准备的：它基于 [Base UI Button](https://base-ui.com/react/components/button)，提供 tab 停靠点、`role="button"` 与 Enter / Space 行为。
 
 > [!WARNING]
 > **不要把 `<text>` 嵌套进 `<text>`。** 相邻的 `<text>` 兄弟会合并成一行；另一个 `<text>` 内的 `<text>` 子项则会被当作一个嵌套 div 处理。
@@ -2593,13 +2515,13 @@ Rust、TypeScript、TSX、JavaScript、JSX、Python、Go、JSON、Bash、TOML、
 
 | 元素 | 文档 |
 |---|---|
-| `code` / `diff` / `markdown` | [原生文本组件](#native-text) |
-| `input` / `textarea` | [文本输入](#text-input) |
-| `virtual-list` | [虚拟列表](#virtual-list) |
+| `code` / `diff` / `markdown` | [原生文本组件](#原生文本组件) |
+| `input` / `textarea` | [文本输入](#文本输入) |
+| `virtual-list` | [虚拟列表](#虚拟列表) |
 | `img` / `svg` | [图像与图标](#图像与图标) |
-| `anchored` | [无样式控件](#headless-controls) |
-| 事件属性 | [支持的事件](#events) |
-| 布局与视觉样式 | [支持的样式](#styling) |
+| `anchored` | [无样式控件](#无样式控件) |
+| 事件属性 | [支持的事件](#支持的事件) |
+| 布局与视觉样式 | [支持的样式](#支持的样式) |
 
 ## 图像与图标
 
@@ -2752,13 +2674,7 @@ const searchSvg = readFileSync(
 
 Node.js 也有 [text modules](https://nodejs.org/api/esm.html#text-modules)，但当前需要 `--experimental-import-text`。在 text import 不再需要运行时标志之前，优先用 `readFileSync`。
 
-## events
-
----
-title: 支持的事件
-description: '全部事件属性与载荷字段、指针捕获的触发规则，以及滚轮不冒泡这一点。'
-eyebrow: 参考
----
+## 支持的事件
 
 | 事件 | 属性 | 载荷字段 |
 |---|---|---|
@@ -2786,7 +2702,7 @@ eyebrow: 参考
 
 键盘与焦点监听器会自动创建一个持久的 GPUI `FocusHandle`。仅加监听器并不会把 `div` 放进 Tab 顺序；为此要加上 `tabIndex={0}`。输入框与多行文本框已经使用 tab index `0`。
 
-## 监听器可以放在哪里
+### 监听器可以放在哪里
 
 把监听器放在 `div`、`text`、`img`、`svg`、`input`、`textarea`、`code`、`markdown`、`diff` 或 `anchored` 上。
 
@@ -2801,11 +2717,11 @@ eyebrow: 参考
 </div>
 ```
 
-## 文件拖放
+### 文件拖放
 
 来自 Finder 或系统的文件拖放会落在注册了 `onFileDrop` 的悬停元素上。`paths` 是绝对 Unicode 文件系统路径的数组。`x` 和 `y` 是窗口像素坐标系下的拖放落点。空拖放，或拖放中包含非 Unicode 路径时，不会触发。
 
-## 指针捕获
+### 指针捕获
 
 同时监听 `onMouseDown` 和 `onMouseMove` 的节点会**捕获指针**，类似 HTML 的 [`setPointerCapture`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setPointerCapture)。在指针离开命中区、离开父级、离开窗口之后，`onMouseMove` 和 `onMouseUp` 仍会继续触发。只有 `onMouseDown` / `onMouseUp` 的节点不会捕获，所以在外部松开时点击依然会结束。
 
@@ -2827,7 +2743,7 @@ eyebrow: 参考
 
 `onClick` 在左键松开时触发。其它按键请用 `onAuxClick` 并读取 `event.isRightClick`。`onMouseDown` 与 `onMouseUp` 通过 `event.button`（`0` 左键、`1` 中键、`2` 右键）能看到每一个按键。
 
-## 滚轮不冒泡
+### 滚轮不冒泡
 
 > [!IMPORTANT]
 > 滚轮不像 DOM 事件那样冒泡。GPUI 只对一层已绘制元素做命中测试，因此滚轮会传到元素**背后**的任何一个可滚动容器上，而不只是祖先。一个浮在无关滚动面板上方的绝对定位卡片，会把那个面板滚起来。给真正的遮罩元素设置 `pointerEvents: "auto"`，让它连滚轮也一起吞掉。
@@ -2837,15 +2753,9 @@ eyebrow: 参考
 > [!NOTE]
 > `pointerEvents: "none"` 意味着该元素**不插入命中盒**，所以它不会挡住身后的任何东西。它并不会禁用同一元素上的监听器，也不会被继承，因此子元素仍保留自己的命中盒。
 
-一个填充了内容、位于点击目标内部的子元素（开关滑块、单选点、勾选图标）需要 `pointerEvents: "none"`，否则它会吃掉父元素的点击。对于 Select 与 Combobox 的行，请改用 item 原语的 `asChild` prop。详见[无样式控件](#headless-controls)。
+一个填充了内容、位于点击目标内部的子元素（开关滑块、单选点、勾选图标）需要 `pointerEvents: "none"`，否则它会吃掉父元素的点击。对于 Select 与 Combobox 的行，请改用 item 原语的 `asChild` prop。详见[无样式控件](#无样式控件)。
 
-## styling
-
----
-title: 支持的样式
-description: '完整属性清单、颜色文法、渐变与阴影写法，以及 hover / active / focusVisible 的原生行为。'
-eyebrow: 参考
----
+## 支持的样式
 
 通过 `style` 属性做类 CSS 的样式设置：
 
@@ -2877,7 +2787,7 @@ eyebrow: 参考
 > - **不要把 `<text>` 嵌套进 `<text>`。** 相邻的 `<text>` 兄弟会合并成一行。另一个 `<text>` 内的 `<text>` 子项是一个嵌套 div。
 > - **`<input>` 没有默认内边距。** 在 input 的样式上设 `padding`，或在父包裹层上留白。input 会自动按其自身的 `borderRadius` 裁剪。
 
-## 属性总览
+### 属性总览
 
 **布局：** `display`（`"flex"` | `"grid"`）、`flexDirection`、`flexWrap`、`flexGrow`、`flexShrink`、`flexBasis`、`alignItems`、`alignSelf`、`alignContent`、`justifyContent`、`gap`、`rowGap`、`columnGap`、`gridTemplateColumns`、`gridTemplateRows`、`gridColumnMin`、`gridRowMin`
 
@@ -2897,7 +2807,7 @@ eyebrow: 参考
 
 **焦点：** `focusVisible`
 
-## 光标
+### 光标
 
 `cursor` 接受 CSS 关键字。未列出的关键字会被忽略，就像其它无效的样式值一样。
 
@@ -2913,7 +2823,7 @@ eyebrow: 参考
 <div style={{ cursor: 'col-resize' }} />
 ```
 
-## 颜色
+### 颜色
 
 所有带颜色的样式字段都接受同一套字符串文法。GPUIX 原生使用 `csscolorparser` 0.8.3，接受：
 
@@ -2925,7 +2835,7 @@ eyebrow: 参考
 
 标准逗号写法与现代空格/斜杠 alpha 写法都可用。GPUI 绘制前会把值转换为硬裁剪的 sRGB。无效字符串只会被该属性忽略，不会拒绝整个样式对象。
 
-### 线性渐变
+#### 线性渐变
 
 `background` 接受 GPUI 原生的**两色标线性渐变**。角度遵循 CSS 规则：`0` 指向上方，数值顺时针增大。色标位置用 `0` 到 `1`。
 
@@ -2950,7 +2860,7 @@ eyebrow: 参考
 
 `hsv()`、`hsva()` 与 `hwba()` 是解析器的扩展，而非 CSS Color 4 标准函数。`color()`、平台/动态颜色，以及数值形式的颜色整数均不被接受。
 
-### 现代颜色语法
+#### 现代颜色语法
 
 主题值可以使用同样的现代文法：
 
@@ -2977,7 +2887,7 @@ const theme = {
 />
 ```
 
-## 阴影
+### 阴影
 
 `boxShadow` 接受单个结构化阴影。其字段为 `offsetX`、`offsetY`、`blurRadius`、`spreadRadius` 与 `color`：
 
@@ -2995,7 +2905,7 @@ const theme = {
 />
 ```
 
-## 悬停与激活
+### 悬停与激活
 
 `hover` 与 `active` 是**嵌套的样式对象**。当指针悬停在元素上或鼠标按下时，GPUI 会以原生方式应用它们，没有 JavaScript 往返。
 
@@ -3017,7 +2927,7 @@ const theme = {
 
 它们对**所有**元素都有效，包括 `<text>`、`<code>`、`<markdown>`、`<diff>`、`<img>`、`<svg>` 以及编辑器。唯一的例外是 `<virtual-list>`，它的 `style` 类型不接受它们：gpui 的列表没有可持有悬停或按下状态的交互身份，所以请把它们放在包裹用的 `<div>` 上。
 
-## 焦点样式
+### 焦点样式
 
 `focusVisible` 是一个嵌套样式对象，类似 `hover`。它在元素拥有焦点**且最后一次输入来自键盘**时应用，类似 CSS 的 `:focus-visible`。GPUI 会以原生方式应用它。
 
@@ -3036,7 +2946,7 @@ const theme = {
 
 它需要一个**可聚焦**的元素：`tabIndex`、某个键或焦点监听器、`<input>`、`<textarea>`，或 `Button` 之类的原语。
 
-### 默认行为：其余一切变暗
+#### 默认行为：其余一切变暗
 
 GPUIX 不画任何环。当某个控件（`Button`、设置了 `tabIndex` 的 div）拥有键盘焦点时，每一个**其它**可聚焦元素都会以 40% 的不透明度渲染。被聚焦的那个保持原样，于是你能一眼看清 Tab 能到达的所有元素。
 
@@ -3065,7 +2975,7 @@ render(<App />, { keyboardFocusDim: false })
 
 **是描边（outline）不是边框（border）。** `outlineWidth`、`outlineColor` 与 `outlineOffset` 在边框盒外侧画线，类似 CSS 的 `outline`。它**不占布局空间**，所以用 `focusVisible` 加的环不会移动任何东西。负的 offset 会把它画在内侧。它遵循 `borderRadius`。设置了 `overflow: "hidden"` 的父级会裁剪它，就像在浏览器里一样。
 
-## 两处文本注意事项
+### 两处文本注意事项
 
 > [!WARNING]
 > **white-space: pre 不受支持**
@@ -3076,13 +2986,7 @@ render(<App />, { keyboardFocusDim: false })
 > [!IMPORTANT]
 > **GPUI 默认文本颜色是黑色而非白色。** 与 CSS 不同，GPUI 不会从父元素继承 `color`。每一个没有显式设置 `color` 样式的 `<text>` 元素都会渲染为黑色 —— 在深色背景上会不可见。请务必在你的文本元素或父级 `<div>` 上设置 `color`（父级 `<div>` 会通过 GPUI 的 `Styled` trait 把 `text_color` 应用到该子树的所有子元素）。
 
-## automation
-
----
-title: 自动化
-description: '三种宿主（测试 root、浏览器页面、子进程）共用一套客户端，含定位器、鼠标与时钟控制。'
-eyebrow: 自动化
----
+## 自动化
 
 用 **`testId`** 标记元素，然后像 Playwright 那样驱动它们。同一个客户端可在 vitest、浏览器页面内，以及针对子进程时使用。鼠标操作在三种宿主里都走普通的 GPUI 输入路径。
 
@@ -3125,7 +3029,7 @@ connectTest(renderer)      globalThis.gpuix                child stdin / stdout
                                   click, fill, query, clock
 ```
 
-## 浏览器应用
+### 浏览器应用
 
 每次浏览器渲染都会把自动化 `App` 安装为 **`globalThis.gpuix`**。在 `render()` 返回后它始终可用，无需设置标志或独立的传输层。
 
@@ -3173,7 +3077,7 @@ await page.screenshot({
 
 不要为此去读 `window.devicePixelRatio`。自动化工具可能在 GPUI 已经确定画布尺寸之后覆盖了视口缩放因子，那时两者就会产生分歧。
 
-## 定位器
+### 定位器
 
 | 调用 | 匹配 |
 |---|---|
@@ -3184,7 +3088,7 @@ await page.screenshot({
 
 `click()` 命中最后一次绘制边界的中心。`fill(text)` 替换获得焦点的编辑器内容。`press('enter')` 发送一个按键。`waitFor()` 会轮询直到恰好存在一个匹配。`textContent()` 返回节点自身及所有后代的文本，类似 DOM 的 `textContent`。
 
-## 鼠标、滚轮与拖拽
+### 鼠标、滚轮与拖拽
 
 | 调用 | 作用 |
 |---|---|
@@ -3218,7 +3122,7 @@ await app.getByTestId('clip-8').click({ modifiers: 'shift' })
 >
 > `<virtual-list>` 是例外，它不接受 `testId`。gpui 的列表不是交互元素，因此无从记录边界盒子。请把定位器放在包裹用的 `<div>` 上。
 
-## 截图与时钟
+### 截图与时钟
 
 `app.screenshot({ path })` 把当前 GPU 帧写成 PNG。
 
@@ -3234,7 +3138,7 @@ await app.captureFrames('review/sidebar', [
 ])
 ```
 
-## 实时应用
+### 实时应用
 
 `launch({ command, args })` 启动应用，并通过 stdin 以与 SSE `data:` 行相同的方式发送命令。应用仅在 stdin 是**管道**时才监听，因此普通的终端运行不受影响。没有 `data:` 前缀的行会被忽略，`console.log` 不会破坏消息。
 
@@ -3260,15 +3164,9 @@ await app.close()
 
 更多背景见[后台启动与 agent 驱动](#后台启动与-agent-驱动)。
 
-## testing
+## 测试
 
----
-title: 测试
-description: 'GPU 支撑的测试渲染器、低层事件模拟 API，以及断言数字而非像素的写法。'
-eyebrow: 自动化
----
-
-[自动化](#automation)里的定位器构建在一个 **GPU 支撑的测试渲染器**（`TestGpuixRenderer`）之上。它与生产环境运行相同的 `GpuixView`、`build_element()`、`apply_styles()` 与事件处理程序。测试窗口被放置在屏幕外，并由 macOS 上的 Metal 或 Windows 上的 DirectX 渲染。当定位器不够用时，下面这些方法是更底层的 API。
+[自动化](#自动化)里的定位器构建在一个 **GPU 支撑的测试渲染器**（`TestGpuixRenderer`）之上。它与生产环境运行相同的 `GpuixView`、`build_element()`、`apply_styles()` 与事件处理程序。测试窗口被放置在屏幕外，并由 macOS 上的 Metal 或 Windows 上的 DirectX 渲染。当定位器不够用时，下面这些方法是更底层的 API。
 
 | 平台 | 测试渲染器 | PNG 捕获 |
 |---|---|---|
@@ -3294,7 +3192,7 @@ renderer.captureScreenshot('/tmp/test.png')
 const text = renderer.getAllText()
 ```
 
-## 测试原生元素
+### 测试原生元素
 
 `getAllText()` 只能看到留存树中的 `<text>` 节点。`<code>`、`<diff>` 与 `<markdown>` 是在 GPUI 内部绘制文本的，因此要用 `getPaintedText()`，它会按绘制顺序返回最后一帧里绘制的所有字符串：
 
@@ -3322,7 +3220,7 @@ expect(hit.text.slice(hit.start, hit.end)).toBe('quick')
 expect(hit.rects).toHaveLength(1)
 ```
 
-## 断言数字，而非像素
+### 断言数字，而非像素
 
 对于一个有状态的交互面，把你想断言的状态绘制进一个 **readout** 元素，再用 `textContent()` 读取。截图只告诉你有东西变了；readout 会告诉你变了什么，而且失败信息会直接给出那个数字。
 
@@ -3342,7 +3240,7 @@ expect(readout).toBe('x=140 y=60 zoom=24 sel=clip-7')
 >
 > 否则你计时的只是 React 更新，而不包含随后发生的任何 GPUI 构建、布局与绘制。参见[虚拟列表](#可平移表面必须裁剪)中的 p50 对比。
 
-## 截图落盘位置
+### 截图落盘位置
 
 截图落在 `packages/react/screenshots/` 与 `examples/screenshots/`，两者都在 gitignore 中，因此可在运行后检查，而不会给每次提交增加一个二进制 diff。README 引用的精选图集位于 [`docs/images/`](https://github.com/remorses/gpuix/tree/main/docs/images)，可用以下命令重新生成：
 
@@ -3350,13 +3248,7 @@ expect(readout).toBe('x=140 y=60 zoom=24 sel=clip-7')
 bun scripts/screenshots.ts
 ```
 
-## developing-rust
-
----
-title: 开发 Rust 侧
-description: '为什么原生模块无法热重载、重新编译的实际耗时，以及 bun run dev 的工作流。'
-eyebrow: 参考
----
+## 开发 Rust 侧
 
 JS 重挂载已在[热重载](#热重载)里讲过。原生那一半**没有热重载**，也不可能做到：对 `.node` 文件的 `require()` 会调用 `process.dlopen`，而 Node 没有配套的卸载，活动状态（GPUI 的平台、GPU 设备、已打开的窗口、UI 线程以及选区注册表）都留在已加载的库里。第二次加载会在第一个库仍被加载的同时创造出独立的原生状态。
 
@@ -3380,20 +3272,20 @@ bun scripts/dev.ts --app native-text   # rebuild, restart an example app
 > [!TIP]
 > 截图模式是更好的默认选择。用 Preview.app 打开 `packages/react/screenshots/showcase.png`，它会在写入时自动刷新；而且与现实窗口不同，PNG 也能被 agent 读取。
 
-## 两件完全避免重新编译的事
+### 两件完全避免重新编译的事
 
 - **内容**本身就在 props 里。修改 `patch` 或 `source`，下一帧就会显示。
 - **设计数值**在 `theme.metrics` 里。调整行高或标题字号只是一次 React 重渲染。
 
 参见[原生文本组件](#布局数字也住在主题里)。
 
-## 确定性调度
+### 确定性调度
 
 测试渲染器使用 `VisualTestAppContext` 配合 `TestDispatcher` 来实现确定性调度。事件模拟走的是 GPUI 基于坐标的命中测试与派发 —— 而不是合成的 JS 事件。
 
-详见[测试](#testing)。
+详见[测试](#测试)。
 
-## 贡献指南
+### 贡献指南
 
 详细的架构、通信流程与贡献指南见 [AGENTS.md](https://github.com/remorses/gpuix/blob/main/AGENTS.md)。
 
@@ -3458,11 +3350,11 @@ bun scripts/dev.ts --app native-text   # rebuild, restart an example app
 
 | 限制 | 说明 |
 |---|---|
-| 没有嵌套滚动 | 只允许一个父元素滚动，见[滚动](#scrolling) |
+| 没有嵌套滚动 | 只允许一个父元素滚动，见[滚动](#滚动) |
 | Linux 忽略 `focus` | 窗口仍会以聚焦状态打开，见[后台启动](#后台启动与-agent-驱动) |
 | 浏览器渲染器无窗口控制 | `minimizeWindow` 等在浏览器中不可用 |
-| 浏览器渲染器无 AccessKit | 无障碍 props 在 wasm 构建中是空操作，见[无障碍](#accessibility) |
-| Linux 测试渲染器 | 暂不支持，等待 GPUI 的 wgpu 无头渲染器，见[测试](#testing) |
+| 浏览器渲染器无 AccessKit | 无障碍 props 在 wasm 构建中是空操作，见[无障碍](#无障碍) |
+| Linux 测试渲染器 | 暂不支持，等待 GPUI 的 wgpu 无头渲染器，见[测试](#测试) |
 | 颜色文法是 `csscolorparser` 0.8.3 | `hsv()` / `hsva()` / `hwba()` 是解析器扩展而非 CSS Color 4 标准函数；不支持径向、锥形与重复渐变，也不支持超过两个色标的渐变，见[支持的样式](#颜色) |
 
 > [!NOTE]
