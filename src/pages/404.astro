@@ -9,8 +9,14 @@ import { QUICK_START_HREF } from '../lib/site'
   <Header />
   <main id="main" class="mx-auto max-w-[104rem] px-4 py-16 sm:px-6 lg:py-24">
     <div class="max-w-[44rem]">
-      <p class="font-mono text-[13px] text-accent">404</p>
-      <h1 class="mt-3 text-[2.05rem] leading-[1.2] font-semibold tracking-[-0.022em] text-ink">
+      <p
+        aria-hidden="true"
+        class="font-mono leading-none font-bold tracking-tighter text-transparent select-none"
+        style="font-size: clamp(4.5rem, 14vw, 8.5rem); -webkit-text-stroke: 1.5px var(--color-line-strong)"
+      >
+        404
+      </p>
+      <h1 class="mt-4 text-[2.05rem] leading-[1.2] font-semibold tracking-[-0.022em] text-ink">
         页面不存在
       </h1>
       <p class="mt-4 text-pretty leading-relaxed text-ink-muted">

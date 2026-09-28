@@ -25,6 +25,9 @@ const shell: Record<Props['variant'], { list: string; item: string }> = {
           在文档页上 h1 出现在侧边栏之后，h2 先于 h1 会打乱标题层级。 */}
       <p class:list={['label-mono', variant === 'sidebar' ? 'mb-2 px-2' : 'mb-2.5']}>
         {group.title}
+        {variant === 'inline' && (
+          <span class="text-ink-faint"> · {group.items.length} 篇</span>
+        )}
       </p>
       <ul class={shell[variant].list}>
         {group.items.map((item) => {

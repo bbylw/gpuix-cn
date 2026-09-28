@@ -5,6 +5,7 @@ import Header from '../components/Header.astro'
 import Sidebar from '../components/Sidebar.astro'
 import Toc from '../components/Toc.astro'
 import CodeEnhance from '../components/CodeEnhance.astro'
+import { Icon } from 'astro-icon/components'
 import type { NavItem } from '../lib/nav'
 import { SITE_TITLE } from '../lib/site'
 
@@ -13,11 +14,13 @@ interface Props {
   description: string
   headings: MarkdownHeading[]
   eyebrow?: string
+  /** 构建期按正文体量实算的阅读分钟数 */
+  minutes?: number
   prev?: NavItem
   next?: NavItem
 }
 
-const { title, description, headings, eyebrow, prev, next } = Astro.props
+const { title, description, headings, eyebrow, minutes, prev, next } = Astro.props
 ---
 
 <Base
@@ -33,13 +36,13 @@ const { title, description, headings, eyebrow, prev, next } = Astro.props
     <main id="main" class="min-w-0 flex-1 px-4 pt-10 pb-24 sm:px-8 lg:px-10">
       <div class="mx-auto flex w-full max-w-[74rem] gap-14">
         <article class="min-w-0 flex-1">
-          <header class="mb-10">
-            {
-              eyebrow && (
-                <p class="label-mono mb-2.5 text-accent">{eyebrow}</p>
-              )
-            }
-            <h1 class="text-[2.05rem] leading-[1.2] font-semibold tracking-[-0.022em] text-balance text-ink">
+          <header class="mb-10 border-b border-line pb-8">
+            <p class="label-mono mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+              {eyebrow && <span class="text-accent">{eyebrow}</span>}
+              {eyebrow && minutes !== undefined && <span aria-hidden="true">·</span>}
+              {minutes !== undefined && <span>约 {minutes} 分钟</span>}
+            </p>
+            <h1 class="text-[length:var(--text-doc-title)] leading-[1.15] font-semibold tracking-[-0.022em] text-balance text-ink">
               {title}
             </h1>
             <p class="mt-3 max-w-[62ch] text-[1.0625rem] leading-relaxed text-pretty text-ink-muted">
@@ -56,10 +59,17 @@ const { title, description, headings, eyebrow, prev, next } = Astro.props
               prev ? (
                 <a
                   href={prev.href}
-                  class="group flex flex-col gap-1 rounded-card border border-line p-4 transition-colors hover:border-line-strong hover:bg-canvas-subtle"
+                  class="group flex items-center gap-3 rounded-card border border-line p-4 transition-colors hover:border-line-strong hover:bg-canvas-subtle"
                 >
-                  <span class="label-mono">上一页</span>
-                  <span class="text-[0.9375rem] font-medium text-ink">{prev.title}</span>
+                  <Icon
+                    name="ph:arrow-left-bold"
+                    aria-hidden="true"
+                    class="size-4 shrink-0 text-ink-faint transition-all group-hover:-translate-x-0.5 group-hover:text-accent"
+                  />
+                  <span class="flex min-w-0 flex-col gap-1">
+                    <span class="label-mono">上一页</span>
+                    <span class="truncate text-[0.9375rem] font-medium text-ink">{prev.title}</span>
+                  </span>
                 </a>
               ) : (
                 <span />
@@ -69,10 +79,17 @@ const { title, description, headings, eyebrow, prev, next } = Astro.props
               next && (
                 <a
                   href={next.href}
-                  class="group flex flex-col items-end gap-1 rounded-card border border-line p-4 transition-colors hover:border-line-strong hover:bg-canvas-subtle sm:col-start-2"
+                  class="group flex items-center justify-end gap-3 rounded-card border border-line p-4 text-right transition-colors hover:border-line-strong hover:bg-canvas-subtle sm:col-start-2"
                 >
-                  <span class="label-mono">下一页</span>
-                  <span class="text-[0.9375rem] font-medium text-ink">{next.title}</span>
+                  <span class="flex min-w-0 flex-col items-end gap-1">
+                    <span class="label-mono">下一页</span>
+                    <span class="truncate text-[0.9375rem] font-medium text-ink">{next.title}</span>
+                  </span>
+                  <Icon
+                    name="ph:arrow-right-bold"
+                    aria-hidden="true"
+                    class="size-4 shrink-0 text-ink-faint transition-all group-hover:translate-x-0.5 group-hover:text-accent"
+                  />
                 </a>
               )
             }

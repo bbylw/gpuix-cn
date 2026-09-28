@@ -31,6 +31,10 @@ export const getStaticPaths = (async () => {
 const { entry, prev, next } = Astro.props
 const { Content, headings } = await render(entry)
 
+// 阅读时长：中文约 400 字 / 分钟，向上取整，至少 1 分钟。
+// 从源码体量实算，不是拍脑袋的数字。
+const minutes = Math.max(1, Math.round((entry.body?.length ?? 0) / 400))
+
 // 显式在正文里 import MDX 组件的文档不需要这份映射；
 // 未 import 就能用的那几篇依赖它。两者并存，map 只是兜底。
 const needsMdxMap = /\b(Callout|Feature|FeatureList)\b/.test(entry.body ?? '')
@@ -41,6 +45,7 @@ const needsMdxMap = /\b(Callout|Feature|FeatureList)\b/.test(entry.body ?? '')
   description={entry.data.description}
   headings={headings}
   eyebrow={entry.data.eyebrow}
+  minutes={minutes}
   prev={prev}
   next={next}
 >

@@ -74,16 +74,24 @@ const metrics = [
         class="mx-auto grid max-w-[78rem] items-center gap-12 px-5 pt-14 pb-16 sm:px-8 lg:grid-cols-[1fr_minmax(0,27rem)] lg:gap-16 lg:pt-20 lg:pb-20"
       >
         <div>
+          <p class="rise rise-1 mb-5">
+            <span
+              class="inline-flex items-center gap-2 rounded-full border border-line bg-canvas-subtle py-1 pr-3.5 pl-2.5 font-mono text-[11px] tracking-wide text-ink-muted"
+            >
+              <span aria-hidden="true" class="size-1.5 rounded-full bg-accent"></span>
+              中文文档 · React / Solid → GPU
+            </span>
+          </p>
           <h1
-            class="rise rise-1 text-[length:var(--text-hero)] leading-[1.1] font-semibold tracking-[-0.032em] text-balance text-ink"
+            class="rise rise-2 text-[length:var(--text-hero)] leading-[1.1] font-semibold tracking-[-0.032em] text-balance text-ink"
           >
             React 的写法，<br class="hidden sm:block" />GPU 的渲染管线
           </h1>
-          <p class="rise rise-2 mt-5 max-w-[44ch] text-lg leading-relaxed text-pretty text-ink-muted">
+          <p class="rise rise-3 mt-5 max-w-[44ch] text-lg leading-relaxed text-pretty text-ink-muted">
             用 TypeScript 写 React 或 Solid 组件树，GPUIX 把它交给 GPUI，由 Metal、DirectX 或
             Vulkan 直接画出来。没有 Electron，也没有 WebView。
           </p>
-          <div class="rise rise-3 mt-9 flex flex-wrap items-center gap-3">
+          <div class="rise rise-4 mt-9 flex flex-wrap items-center gap-3">
             <a
               href={QUICK_START_HREF}
               class="inline-flex h-11 items-center gap-2 rounded-card bg-accent px-5 text-sm font-medium text-accent-ink transition-colors hover:bg-accent-hover active:translate-y-[1px]"
@@ -100,8 +108,8 @@ const metrics = [
           </div>
         </div>
 
-        <div class="rise rise-2 min-w-0">
-          <div class="code-frame">
+        <div class="rise rise-3 min-w-0">
+          <div class="code-frame shadow-lift">
             <div class="code-toolbar">
               <span class="code-lang">app.tsx</span>
               <span class="label-mono">一个文件的全部</span>
@@ -120,7 +128,7 @@ const metrics = [
 
     <!-- ============ 管线：横向轨 ============ -->
     <section class="border-b border-line py-16 sm:py-20">
-      <div class="mx-auto max-w-[78rem] px-5 sm:px-8">
+      <div class="reveal mx-auto max-w-[78rem] px-5 sm:px-8">
         <h2
           class="text-[length:var(--text-title)] leading-tight font-semibold tracking-[-0.022em] text-balance text-ink"
         >
@@ -143,12 +151,18 @@ const metrics = [
           {
             pipeline.map((step, i) => (
               <li class="border-b border-line px-0 py-5 sm:px-6 sm:first:pl-0 sm:last:pr-0">
-                <span
-                  class:list={[
-                    'block h-[2px] w-6',
-                    i === pipeline.length - 1 ? 'bg-accent' : 'bg-line-strong',
-                  ]}
-                />
+                <div class="flex items-center gap-3">
+                  <span class="font-mono text-[11px] tracking-widest text-ink-faint">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    class:list={[
+                      'block h-[2px] flex-1',
+                      i === pipeline.length - 1 ? 'bg-accent' : 'bg-line',
+                    ]}
+                  />
+                </div>
                 <h3 class="mt-3.5 text-[0.9375rem] font-semibold text-ink">{step.stage}</h3>
                 <p class="mt-1 text-[13.5px] leading-relaxed text-pretty text-ink-muted">
                   {step.body}
@@ -161,8 +175,8 @@ const metrics = [
         <dl class="mt-8 flex flex-wrap items-baseline gap-x-10 gap-y-3">
           {
             metrics.map((metric) => (
-              <div class="flex items-baseline gap-2">
-                <dd class="font-mono text-xl font-semibold tracking-[-0.02em] text-ink">
+              <div class="flex items-baseline gap-2.5">
+                <dd class="font-mono text-[1.65rem] leading-none font-semibold tracking-[-0.02em] text-ink">
                   {metric.value}
                 </dd>
                 <dt class="label-mono">{metric.label}</dt>
@@ -175,7 +189,7 @@ const metrics = [
 
     <!-- ============ 能力：非等分 bento ============ -->
     <section class="border-b border-line py-16 sm:py-20">
-      <div class="mx-auto max-w-[78rem] px-5 sm:px-8">
+      <div class="reveal mx-auto max-w-[78rem] px-5 sm:px-8">
         <h2
           class="text-[length:var(--text-title)] leading-tight font-semibold tracking-[-0.022em] text-balance text-ink"
         >
@@ -184,7 +198,7 @@ const metrics = [
 
         <div class="mt-10 grid gap-4 lg:grid-cols-6">
           <!-- A：大图块 -->
-          <div class="relative min-h-[19rem] overflow-hidden rounded-card bg-canvas lg:col-span-4 lg:row-span-2">
+          <div class="relative min-h-[19rem] overflow-hidden rounded-card bg-canvas shadow-lift lg:col-span-4 lg:row-span-2">
             <Image
               src={surface}
               alt=""
@@ -193,9 +207,10 @@ const metrics = [
               class="absolute inset-0 size-full object-cover"
             />
             {/* 图片本身是深色帧缓冲，文字必须压在深底上才读得出来，
-                因此遮罩用 on-media-scrim 而不是随主题翻转的 canvas。 */}
+                因此遮罩用 on-media-scrim 而不是随主题翻转的 canvas。
+                底部实色起步，保证浅色模式下也有足够对比度。 */}
             <div
-              class="absolute inset-0 bg-linear-to-t from-on-media-scrim/95 via-on-media-scrim/55 to-transparent"
+              class="absolute inset-0 bg-linear-to-t from-on-media-scrim via-on-media-scrim/60 to-transparent"
               aria-hidden="true"
             >
             </div>
@@ -226,6 +241,30 @@ const metrics = [
               React 只发一次目标值，Rust 计算中间帧并自己请求刷新。每一帧都不触发一次 React
               渲染，也不走 N-API。
             </p>
+            <svg
+              viewBox="0 0 200 96"
+              class="mt-5 w-full"
+              role="img"
+              aria-label="缓动曲线：目标值下发一次，中间帧逐帧算出"
+            >
+              <g stroke="currentColor" class="text-line" stroke-width="1">
+                <line x1="0" y1="24" x2="200" y2="24" stroke-dasharray="3 4"></line>
+                <line x1="0" y1="48" x2="200" y2="48" stroke-dasharray="3 4"></line>
+                <line x1="0" y1="72" x2="200" y2="72" stroke-dasharray="3 4"></line>
+              </g>
+              <path
+                d="M4 88 C 60 88, 72 8, 196 8"
+                fill="none"
+                stroke="currentColor"
+                class="text-accent"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <circle cx="4" cy="88" r="3" fill="currentColor" class="text-line-strong"></circle>
+              <circle cx="196" cy="8" r="3.5" fill="currentColor" class="text-accent"></circle>
+              <text x="186" y="92" font-size="9" font-family="var(--font-mono)" fill="currentColor" class="text-ink-faint">t</text>
+              <text x="2" y="14" font-size="9" font-family="var(--font-mono)" fill="currentColor" class="text-ink-faint">v</text>
+            </svg>
           </div>
 
           <!-- C -->
@@ -234,10 +273,17 @@ const metrics = [
             <p class="mt-2 text-[14px] leading-relaxed text-pretty text-ink-muted">
               两套运行时，同一套元素协议。
             </p>
-            <ul class="mt-4 space-y-1.5">
+            <ul class="mt-4 space-y-2">
               {
-                ['@gpuix/react', '@gpuix/solid'].map((pkg) => (
-                  <li class="font-mono text-[12.5px] text-accent">{pkg}</li>
+                [
+                  { pkg: '@gpuix/react', note: 'React 运行时' },
+                  { pkg: '@gpuix/solid', note: 'Solid 运行时' },
+                ].map((row) => (
+                  <li class="flex items-center gap-2 rounded-chip border border-line bg-canvas px-2.5 py-1.5">
+                    <span aria-hidden="true" class="font-mono text-[12px] text-accent">›</span>
+                    <span class="font-mono text-[12.5px] text-ink">{row.pkg}</span>
+                    <span class="label-mono ml-auto">{row.note}</span>
+                  </li>
                 ))
               }
             </ul>
@@ -249,18 +295,27 @@ const metrics = [
             <p class="mt-2 text-[14px] leading-relaxed text-pretty text-ink-muted">
               React 与 Rust 保留全部行，GPUI 只构建靠近视口的那几行。行高可以各不相同，你不必先声明。
             </p>
-            <div class="mt-5 flex items-center gap-2" role="img" aria-label="只有视口内的两行被真正构建">
-              <span class="flex-1 space-y-1">
-                <span class="block h-1.5 rounded-chip border border-line"></span>
-                <span class="block h-1.5 rounded-chip border border-line"></span>
+            <div class="mt-5 flex items-start gap-2" role="img" aria-label="只有视口内的两行被真正构建">
+              <span class="flex-1">
+                <span class="block space-y-1">
+                  <span class="block h-1.5 rounded-chip border border-line"></span>
+                  <span class="block h-1.5 rounded-chip border border-line"></span>
+                </span>
+                <span class="label-mono mt-1.5 block text-center">屏外</span>
               </span>
-              <span class="flex-1 space-y-1">
-                <span class="block h-1.5 rounded-chip bg-accent"></span>
-                <span class="block h-1.5 rounded-chip bg-accent"></span>
+              <span class="flex-1">
+                <span class="block space-y-1 rounded-chip border border-accent/50 p-1">
+                  <span class="block h-1.5 rounded-chip bg-accent"></span>
+                  <span class="block h-1.5 rounded-chip bg-accent"></span>
+                </span>
+                <span class="label-mono mt-1.5 block text-center text-accent">视口</span>
               </span>
-              <span class="flex-1 space-y-1">
-                <span class="block h-1.5 rounded-chip border border-line"></span>
-                <span class="block h-1.5 rounded-chip border border-line"></span>
+              <span class="flex-1">
+                <span class="block space-y-1">
+                  <span class="block h-1.5 rounded-chip border border-line"></span>
+                  <span class="block h-1.5 rounded-chip border border-line"></span>
+                </span>
+                <span class="label-mono mt-1.5 block text-center">屏外</span>
               </span>
             </div>
             <p class="label-mono mt-2">实心 = 视口内，真正被构建并绘制的行</p>
@@ -314,7 +369,7 @@ expect(await driver.screenshot()).toMatchFile('counter.png')`}
 
     <!-- ============ 安装：动词轨 ============ -->
     <section class="border-b border-line py-16 sm:py-20">
-      <div class="mx-auto grid max-w-[78rem] gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-20">
+      <div class="reveal mx-auto grid max-w-[78rem] gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-20">
         <div>
           <h2
             class="text-[length:var(--text-title)] leading-tight font-semibold tracking-[-0.022em] text-balance text-ink"
@@ -327,9 +382,13 @@ expect(await driver.screenshot()).toMatchFile('counter.png')`}
 
           <ol class="mt-8">
             {
-              installSteps.map((step) => (
-                <li class="grid grid-cols-[3.5rem_minmax(0,1fr)] items-baseline gap-3 border-t border-line py-4">
-                  <span class="label-mono">{step.verb}</span>
+              installSteps.map((step, i) => (
+                <li class="grid grid-cols-[4.5rem_minmax(0,1fr)] items-baseline gap-3 border-t border-line py-4">
+                  <span class="label-mono">
+                    <span class="text-ink-faint">{String(i + 1).padStart(2, '0')}</span>
+                    {' · '}
+                    {step.verb}
+                  </span>
                   <code class="overflow-x-auto font-mono text-[13.5px] whitespace-nowrap text-ink"
                     >{step.cmd}</code
                   >
@@ -338,6 +397,7 @@ expect(await driver.screenshot()).toMatchFile('counter.png')`}
               ))
             }
           </ol>
+          <p class="label-mono mt-6">macOS · Windows · Linux —— 同一套元素协议，三个桌面平台</p>
         </div>
 
         <CalloutBox>
@@ -359,7 +419,7 @@ expect(await driver.screenshot()).toMatchFile('counter.png')`}
 
     <!-- ============ 文档索引：目录页 ============ -->
     <section class="py-16 sm:py-20">
-      <div class="mx-auto max-w-[78rem] px-5 sm:px-8">
+      <div class="reveal mx-auto max-w-[78rem] px-5 sm:px-8">
         <div class="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
           <h2
             class="text-[length:var(--text-title)] leading-tight font-semibold tracking-[-0.022em] text-balance text-ink"
@@ -381,30 +441,52 @@ expect(await driver.screenshot()).toMatchFile('counter.png')`}
   </main>
 
   <footer class="border-t border-line">
-    <div
-      class="mx-auto flex max-w-[78rem] flex-col gap-4 px-5 py-10 text-sm text-ink-faint sm:flex-row sm:items-center sm:justify-between sm:px-8"
-    >
-      <p>
-        内容整理自 GPUIX 官方 README ·
-        <a
-          href={LICENSE_URL}
-          target="_blank"
-          rel="noreferrer noopener"
-          class="ml-1 text-ink-muted underline decoration-line underline-offset-4 transition-colors hover:text-accent"
-          >Apache-2.0</a
-        >
-      </p>
-      <p class="flex items-center gap-5">
-        <a href={QUICK_START_HREF} class="transition-colors hover:text-ink">快速开始</a>
-        <a href="/docs/roadmap" class="transition-colors hover:text-ink">实现状态</a>
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noreferrer noopener"
-          class="transition-colors hover:text-ink"
-          >GitHub</a
-        >
-      </p>
+    <div class="mx-auto max-w-[78rem] px-5 pt-12 pb-8 sm:px-8">
+      <div class="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p class="flex items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              class="grid size-6 place-items-center rounded-card bg-accent font-mono text-[13px] leading-none font-bold text-accent-ink"
+              >G</span
+            >
+            <span class="text-[0.9375rem] leading-none font-semibold tracking-[-0.01em] text-ink"
+              >GPUIX</span
+            >
+          </p>
+          <p class="mt-3 max-w-[36ch] text-[13.5px] leading-relaxed text-ink-faint">
+            GPU 原生的桌面 UI，中文文档。内容整理自官方 README，示例与 API 以英文原文为准。
+          </p>
+        </div>
+        <nav aria-label="页脚" class="flex items-center gap-6 text-sm text-ink-muted">
+          <a href={QUICK_START_HREF} class="transition-colors hover:text-ink">快速开始</a>
+          <a href="/docs/roadmap" class="transition-colors hover:text-ink">实现状态</a>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            class="inline-flex items-center gap-1.5 transition-colors hover:text-ink"
+          >
+            GitHub
+            <Icon name="ph:arrow-up-right-bold" class="size-3.5" aria-hidden="true" />
+          </a>
+        </nav>
+      </div>
+      <div
+        class="mt-10 flex flex-col gap-2 border-t border-line pt-6 text-[13px] text-ink-faint sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p>
+          {docsNav.reduce((n, group) => n + group.items.length, 0)} 篇文档 ·
+          <a
+            href={LICENSE_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            class="underline decoration-line underline-offset-4 transition-colors hover:text-accent"
+            >Apache-2.0</a
+          >
+        </p>
+        <p class="label-mono">React / Solid → Metal / DirectX / Vulkan</p>
+      </div>
     </div>
   </footer>
 

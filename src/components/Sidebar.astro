@@ -1,7 +1,10 @@
 ---
 import { Icon } from 'astro-icon/components'
 import NavGroups from './NavGroups.astro'
+import { docsNav } from '../lib/nav'
 import { GITHUB_URL, LICENSE_URL } from '../lib/site'
+
+const docCount = docsNav.reduce((n, group) => n + group.items.length, 0)
 ---
 
 <div
@@ -19,6 +22,7 @@ import { GITHUB_URL, LICENSE_URL } from '../lib/site'
     <NavGroups variant="sidebar" />
 
     <div class="mt-8 border-t border-line pt-4">
+      <p class="label-mono mb-2 px-2">{docCount} 篇文档 · 中文</p>
       <a
         href={GITHUB_URL}
         target="_blank"

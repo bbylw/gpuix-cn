@@ -249,9 +249,17 @@ export default function Search() {
 
             <div className="scroll-slim min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
               {index === null && (
-                <p className="px-3 py-8 text-center text-sm text-ink-faint">
-                  正在加载索引…
-                </p>
+                <div role="status" aria-label="正在加载搜索索引" className="space-y-2 p-2">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="animate-pulse rounded-card px-3 py-2.5">
+                      <div
+                        className="h-3.5 rounded-chip bg-surface-2"
+                        style={{ width: `${72 - i * 14}%` }}
+                      />
+                      <div className="mt-1.5 h-3 w-1/3 rounded-chip bg-surface-2" />
+                    </div>
+                  ))}
+                </div>
               )}
 
               {index !== null && query.trim() === '' && (
@@ -284,7 +292,7 @@ export default function Search() {
                       onMouseMove={() => setActive(i)}
                       onClick={() => go(result.entry.h)}
                       className={`cursor-pointer rounded-card px-3 py-2.5 transition-colors ${
-                        i === active ? 'bg-accent-soft' : 'hover:bg-surface'
+                        i === active ? 'option-active bg-accent-soft' : 'hover:bg-surface'
                       }`}
                     >
                       <div className="flex items-center gap-2">
