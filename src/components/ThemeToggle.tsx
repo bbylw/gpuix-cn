@@ -38,7 +38,7 @@ export default function ThemeToggle() {
       onClick={toggle}
       aria-label={label}
       title={label}
-      className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-[5px] text-ink-muted transition-colors hover:bg-surface hover:text-ink"
+      className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-card text-ink-muted transition-colors hover:bg-surface hover:text-ink"
     >
       {/* 未挂载时两个图标都保持隐藏，避免与服务端 HTML 不一致 */}
       <MoonIcon

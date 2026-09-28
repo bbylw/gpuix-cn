@@ -2,8 +2,7 @@ import type { APIRoute } from 'astro'
 import { getCollection } from 'astro:content'
 import { docsNav } from '../lib/nav'
 
-export const prerender = true
-
+/** 与 src/components/Search.tsx 的 IndexEntry 一一对应，改一处要改两处。 */
 interface IndexEntry {
   /** 标题 */
   t: string
@@ -13,11 +12,13 @@ interface IndexEntry {
   h: string
   /** 所属分组 */
   g: string
-  /** 二级标题，用于结果内的上下文提示 */
+  /** 二 / 三级标题，用于结果内的上下文提示 */
   hs: string[]
   /** 去掉 frontmatter 后的正文（源码） */
   c: string
 }
+
+const MAX_HEADINGS = 40
 
 /**
  * 构建时生成的客户端搜索索引。
@@ -57,15 +58,14 @@ export const GET: APIRoute = async () => {
       d: doc.data.description,
       h: href,
       g: groupOf.get(href) ?? '文档',
-      hs: headings.slice(0, 40),
+      hs: headings.slice(0, MAX_HEADINGS),
       c: body,
     })
   }
 
+  // 静态产物：写进文件的 Cache-Control 会被静态托管方忽略，
+  // 缓存策略要在托管平台侧配（Netlify / Vercel / Cloudflare 的 _headers）。
   return new Response(JSON.stringify(entries), {
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600',
-    },
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
   })
 }

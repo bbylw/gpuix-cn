@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MagnifyingGlassIcon } from '@phosphor-icons/react'
+import { lockScroll, unlockScroll } from '../lib/scroll-lock'
 
+/** 与 src/pages/search-index.json.ts 的 IndexEntry 一一对应，改一处要改两处。 */
 interface IndexEntry {
   t: string
   d: string
@@ -18,18 +20,17 @@ interface Scored {
 }
 
 const MAX_RESULTS = 12
+const HOLDER = 'search-dialog'
+const LIST_ID = 'search-results'
 
-/** 高亮命中的关键词，返回 [前缀, 命中, 后缀] 片段。 */
+/**
+ * 命中处的上下文：返回 [前缀, 命中, 后缀]。
+ * 前缀与后缀都可能为空串——标题本来就短于窗口宽度，不该出现省略号。
+ */
 function splitHighlight(text: string, query: string): [string, string, string] | null {
   const at = text.toLowerCase().indexOf(query.toLowerCase())
   if (at === -1) return null
-  const start = Math.max(0, at - 28)
-  const end = Math.min(text.length, at + query.length + 40)
-  return [
-    start > 0 ? '…' : '',
-    text.slice(at, at + query.length),
-    text.slice(end),
-  ]
+  return [text.slice(0, at), text.slice(at, at + query.length), text.slice(at + query.length)]
 }
 
 function score(entry: IndexEntry, query: string): Scored | null {
@@ -69,11 +70,19 @@ export default function Search() {
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState<IndexEntry[] | null>(null)
   const [active, setActive] = useState(0)
+  const [shortcut, setShortcut] = useState('⌘K')
   const inputRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const restoreFocus = useRef<Element | null>(null)
 
-  // 全局快捷键：⌘K / Ctrl+K 打开，/ 也可打开
+  // 快捷键提示要如实反映平台：在 Windows / Linux 上写 ⌘K 是错的。
+  // 挂载后再改，避免 SSR HTML 与首次客户端渲染不一致。
+  useEffect(() => {
+    const apple = /mac|iphone|ipad|ipod/i.test(navigator.userAgent)
+    setShortcut(apple ? '⌘K' : 'Ctrl K')
+  }, [])
+
+  // 全局快捷键：⌘K / Ctrl+K 打开或关闭，/ 也可打开
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null
@@ -103,14 +112,8 @@ export default function Search() {
       return
     }
     restoreFocus.current = document.activeElement
-    // 避免浏览器自动放大移动端输入框
-    const viewport = document.querySelector<HTMLMetaElement>(
-      'meta[name="viewport"]',
-    )
-    const original = viewport?.content
-    viewport?.setAttribute('content', 'width=device-width, initial-scale=1')
     requestAnimationFrame(() => inputRef.current?.focus())
-    document.documentElement.style.overflow = 'hidden'
+    lockScroll(HOLDER)
 
     if (index === null) {
       fetch('/search-index.json')
@@ -120,8 +123,7 @@ export default function Search() {
     }
 
     return () => {
-      document.documentElement.style.overflow = ''
-      if (original) viewport?.setAttribute('content', original)
+      unlockScroll(HOLDER)
       ;(restoreFocus.current as HTMLElement | null)?.focus?.()
     }
   }, [open, index])
@@ -136,16 +138,13 @@ export default function Search() {
       .slice(0, MAX_RESULTS)
   }, [index, query])
 
-  const go = useCallback(
-    (href: string) => {
-      setOpen(false)
-      // Astro 预取已注册，直接整页跳转最稳妥
-      window.location.href = href
-    },
-    [],
-  )
+  const go = useCallback((href: string) => {
+    setOpen(false)
+    // Astro 预取已注册，直接整页跳转最稳妥
+    window.location.href = href
+  }, [])
 
-  function onListKeyDown(event: React.KeyboardEvent) {
+  function onKeyDown(event: React.KeyboardEvent) {
     if (event.key === 'ArrowDown') {
       event.preventDefault()
       setActive((n) => Math.min(n + 1, results.length - 1))
@@ -158,8 +157,32 @@ export default function Search() {
     } else if (event.key === 'Escape') {
       event.preventDefault()
       setOpen(false)
+    } else if (event.key === 'Tab') {
+      // aria-modal 声称焦点被关在对话框里，就必须真的关住：
+      // 否则 Tab 会走到背后的页面上，屏幕阅读器也在两个上下文间跳。
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'input, button:not([disabled]), [href]',
+      )
+      if (!focusable || focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const current = document.activeElement
+
+      if (event.shiftKey && current === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && current === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
   }
+
+  // 活动项变化时把对应 option 滚进视野
+  useEffect(() => {
+    if (!open) return
+    document.getElementById(`search-option-${active}`)?.scrollIntoView({ block: 'nearest' })
+  }, [open, active])
 
   return (
     <>
@@ -167,21 +190,21 @@ export default function Search() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="搜索文档"
-        className="group inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-[5px] border border-line bg-canvas px-2.5 text-sm text-ink-faint transition-colors hover:border-line-strong hover:bg-surface hover:text-ink-soft sm:w-60 sm:px-3"
+        aria-haspopup="dialog"
+        className="group inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-card border border-line bg-canvas px-2.5 text-sm text-ink-faint transition-colors hover:border-line-strong hover:bg-surface hover:text-ink-soft sm:w-60 sm:px-3"
       >
         <MagnifyingGlassIcon size={17} weight="bold" aria-hidden className="shrink-0" />
         <span className="hidden flex-1 text-left sm:inline">搜索文档</span>
-        <kbd className="hidden shrink-0 rounded-[4px] border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] leading-none text-ink-muted sm:inline-block">
-          ⌘K
+        <kbd className="hidden shrink-0 rounded-chip border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] leading-none text-ink-muted sm:inline-block">
+          {shortcut}
         </kbd>
       </button>
 
       {open && (
-        <div
-          className="fixed inset-0 z-[90] flex items-start justify-center px-4 pt-[12vh] pb-8"
-          role="presentation"
-        >
+        <div className="fixed inset-0 z-[90] flex items-start justify-center px-4 pt-[12vh] pb-8">
+          {/* 遮罩只是视觉层，关闭走的是它后面的按钮与 Esc，所以对辅助技术隐藏 */}
           <div
+            aria-hidden="true"
             className="absolute inset-0 bg-ink/25 backdrop-blur-sm dark:bg-black/60"
             onClick={() => setOpen(false)}
           />
@@ -190,20 +213,27 @@ export default function Search() {
             role="dialog"
             aria-modal="true"
             aria-label="搜索文档"
-            className="relative flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-[6px] border border-line-strong bg-overlay shadow-pop"
-            onKeyDown={onListKeyDown}
+            className="relative flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-card border border-line-strong bg-overlay shadow-pop"
+            onKeyDown={onKeyDown}
           >
             <div className="flex items-center gap-3 border-b border-line px-4">
               <MagnifyingGlassIcon size={17} weight="bold" aria-hidden className="shrink-0 text-ink-faint" />
+              {/* combobox 模式：焦点始终留在输入框，选项靠 aria-activedescendant 指向，
+                  屏幕阅读器才能播报「第 3 项，共 12 项」。 */}
               <input
                 ref={inputRef}
+                role="combobox"
+                aria-expanded={results.length > 0}
+                aria-controls={LIST_ID}
+                aria-activedescendant={results[active] ? `search-option-${active}` : undefined}
+                aria-autocomplete="list"
+                aria-label="搜索查询"
                 value={query}
                 onChange={(event) => {
                   setQuery(event.target.value)
                   setActive(0)
                 }}
                 placeholder="搜索标题、标识符或正文…"
-                aria-label="搜索查询"
                 autoComplete="off"
                 spellCheck={false}
                 className="h-12 flex-1 bg-transparent text-[0.9375rem] text-ink outline-none placeholder:text-ink-faint"
@@ -241,48 +271,48 @@ export default function Search() {
                 </p>
               )}
 
-              <ul role="listbox" aria-label="搜索结果">
+              {/* option 必须是 listbox 的直接子元素，所以这里不用 li 包裹。 */}
+              <ul id={LIST_ID} role="listbox" aria-label="搜索结果">
                 {results.map((result, i) => {
                   const parts = splitHighlight(result.entry.t, query.trim())
                   return (
-                    <li key={result.entry.h}>
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={i === active}
-                        onMouseMove={() => setActive(i)}
-                        onClick={() => go(result.entry.h)}
-                        className={`w-full rounded-[5px] px-3 py-2.5 text-left transition-colors ${
-                          i === active ? 'bg-accent-soft' : 'hover:bg-surface'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium text-ink">
-                            {parts ? (
-                              <>
-                                {parts[0]}
-                                <mark className="bg-transparent font-semibold text-accent">
-                                  {parts[1]}
-                                </mark>
-                                {parts[2]}
-                              </>
-                            ) : (
-                              result.entry.t
-                            )}
-                          </span>
-                          <span className="ml-auto shrink-0 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-faint">
-                            {result.entry.g}
-                          </span>
-                        </div>
-                        <p className="mt-0.5 truncate text-[13px] text-ink-muted">
-                          {result.entry.d}
+                    <li
+                      key={result.entry.h}
+                      id={`search-option-${i}`}
+                      role="option"
+                      aria-selected={i === active}
+                      onMouseMove={() => setActive(i)}
+                      onClick={() => go(result.entry.h)}
+                      className={`cursor-pointer rounded-card px-3 py-2.5 transition-colors ${
+                        i === active ? 'bg-accent-soft' : 'hover:bg-surface'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium text-ink">
+                          {parts ? (
+                            <>
+                              {parts[0]}
+                              <mark className="bg-transparent font-semibold text-accent">
+                                {parts[1]}
+                              </mark>
+                              {parts[2]}
+                            </>
+                          ) : (
+                            result.entry.t
+                          )}
+                        </span>
+                        <span className="ml-auto shrink-0 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-faint">
+                          {result.entry.g}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-[13px] text-ink-muted">
+                        {result.entry.d}
+                      </p>
+                      {result.context && (
+                        <p className="mt-0.5 truncate font-mono text-[11px] text-ink-faint">
+                          # {result.context}
                         </p>
-                        {result.context && (
-                          <p className="mt-0.5 truncate font-mono text-[11px] text-ink-faint">
-                            # {result.context}
-                          </p>
-                        )}
-                      </button>
+                      )}
                     </li>
                   )
                 })}
@@ -291,14 +321,16 @@ export default function Search() {
 
             <div className="flex items-center gap-4 border-t border-line px-4 py-2 text-[11px] text-ink-faint">
               <span className="flex items-center gap-1.5">
-                <kbd className="rounded border border-line px-1 py-px font-mono">↑↓</kbd>
+                <kbd className="rounded border border-line bg-surface px-1 py-px font-mono">↑↓</kbd>
                 选择
               </span>
               <span className="flex items-center gap-1.5">
-                <kbd className="rounded border border-line px-1 py-px font-mono">↵</kbd>
+                <kbd className="rounded border border-line bg-surface px-1 py-px font-mono">↵</kbd>
                 打开
               </span>
-              <span className="ml-auto">{results.length > 0 && `${results.length} 条结果`}</span>
+              <span className="ml-auto">
+                {results.length > 0 && `第 ${active + 1} 项，共 ${results.length} 项`}
+              </span>
             </div>
           </div>
         </div>

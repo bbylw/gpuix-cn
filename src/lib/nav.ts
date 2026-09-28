@@ -1,7 +1,6 @@
 export interface NavItem {
   title: string
   href: string
-  badge?: string
 }
 
 export interface NavGroup {

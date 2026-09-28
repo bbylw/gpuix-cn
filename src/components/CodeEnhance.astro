@@ -1,7 +1,7 @@
 ---
 /**
- * 为正文中的所有代码块补充语言标签与「复制」按钮。
- * 代码块是静态 HTML，所以用一段增强脚本比逐块挂载 React 岛屿更合适。
+ * 为代码块补充语言标签与「复制」按钮。
+ * 代码块是静态 HTML，用一段增强脚本比逐块挂载 React 岛屿更合适。
  */
 ---
 
@@ -20,15 +20,19 @@
     toml: 'TOML',
     html: 'HTML',
     css: 'CSS',
+    rs: 'Rust',
+    rust: 'Rust',
+    xml: 'XML',
+    yaml: 'YAML',
+    yml: 'YAML',
+    diff: 'diff',
+    plaintext: 'text',
     text: 'text',
-    textcode: 'text',
   }
 
+  /** Astro 把语言写在 <pre data-language> 上，没有 figure 包裹。 */
   function languageOf(pre: Element): string {
-    const raw =
-      pre.getAttribute('data-language') ??
-      (pre.closest('figure')?.getAttribute('data-language') ?? '')
-    const key = raw.toLowerCase()
+    const key = (pre.getAttribute('data-language') ?? '').toLowerCase()
     return LABELS[key] ?? (key ? key.toUpperCase() : '')
   }
 
@@ -57,61 +61,75 @@
 
   function enhance(pre: HTMLPreElement) {
     if (pre.dataset.enhanced === 'true') return
-    pre.dataset.enhanced = 'true'
 
     const code = pre.querySelector('code')
+    // 先确认拿得到正文再打标记，否则这一块会被永久跳过
     if (!code) return
+    pre.dataset.enhanced = 'true'
+
     const text = code.innerText.replace(/\n$/, '')
-
-    const bar = document.createElement('div')
-    bar.className = 'code-toolbar'
-
-    const label = languageOf(pre)
-    if (label) {
-      const span = document.createElement('span')
-      span.className = 'code-lang'
-      span.textContent = label
-      bar.append(span)
-    }
 
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'code-copy'
-    button.setAttribute('aria-label', '复制这段代码')
     button.textContent = '复制'
 
-    button.addEventListener('click', async () => {
-      const ok = await copy(text)
-      button.classList.add(ok ? 'is-done' : 'is-failed')
-      button.textContent = ok ? '已复制' : '复制失败'
-      window.setTimeout(() => {
+    let reset: number | undefined
+    const report = (ok: boolean) => {
+      window.clearTimeout(reset)
+      button.classList.toggle('is-done', ok)
+      button.classList.toggle('is-failed', !ok)
+      const state = ok ? '已复制' : '复制失败'
+      button.textContent = state
+      // 文本变化对读屏用户不可见，aria-label 一起改才会被播报
+      button.setAttribute('aria-label', ok ? '已复制' : '复制失败，按钮可重试')
+      reset = window.setTimeout(() => {
         button.classList.remove('is-done', 'is-failed')
         button.textContent = '复制'
+        button.setAttribute('aria-label', '复制这段代码')
       }, 1800)
+    }
+
+    button.addEventListener('click', async () => {
+      report(await copy(text))
     })
 
-    bar.append(button)
+    // 已有工具条就补一个复制按钮进去，否则新建一条。
+    // 首页首屏的代码框是手写的 .code-frame + .code-toolbar，
+    // 直接插一条会出现两条工具条。
+    const frame = pre.closest('.code-frame')
+    const bar = frame?.querySelector('.code-toolbar') ?? document.createElement('div')
 
-    const figure = pre.closest('figure')
-    if (figure) {
-      figure.classList.add('code-frame')
-      figure.insertBefore(bar, pre)
-    } else {
+    if (!frame) {
+      const parent = pre.parentElement
+      if (!parent) return
       const wrap = document.createElement('div')
       wrap.className = 'code-frame'
-      pre.parentNode!.insertBefore(wrap, pre)
-      wrap.append(bar, pre)
+      parent.insertBefore(wrap, pre)
+      wrap.append(pre)
     }
+
+    if (!bar.isConnected) {
+      bar.className = 'code-toolbar'
+      ;(frame ?? pre.parentElement)?.insertBefore(bar, pre)
+
+      const label = languageOf(pre)
+      if (label) {
+        const span = document.createElement('span')
+        span.className = 'code-lang'
+        span.textContent = label
+        bar.append(span)
+      }
+    }
+
+    bar.append(button)
   }
 
+  // pre.astro-code 同时覆盖 markdown 围栏块与 <Code> 组件，
+  // 因此首页与文档页的代码块都有工具条。
   function enhanceAll() {
-    document
-      .querySelectorAll<HTMLPreElement>('.prose-doc pre, .prose-doc figure.astro-code pre')
-      .forEach(enhance)
+    document.querySelectorAll<HTMLPreElement>('pre.astro-code').forEach(enhance)
   }
 
   enhanceAll()
-  // 客户端导航切页后重新增强
-  document.addEventListener('astro:after-swap', enhanceAll)
-  document.addEventListener('astro:page-load', enhanceAll)
 </script>

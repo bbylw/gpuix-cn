@@ -77,10 +77,10 @@ import Callout from '../../components/mdx/Callout.astro'
 ## 滚轮不冒泡
 
 <Callout type="important">
-  The wheel does not bubble the way DOM events do. GPUI hit-tests one flat list of painted boxes, so the wheel reaches **any** scroller behind the element, not only an ancestor. An absolute card floating over an unrelated scroll pane will scroll that pane. Give a real overlay `pointerEvents: "auto"`.
+  滚轮不像 DOM 事件那样冒泡。GPUI 只对一层已绘制元素做命中测试，因此滚轮会传到元素**背后**的任何一个可滚动容器上，而不只是祖先。一个浮在无关滚动面板上方的绝对定位卡片，会把那个面板滚起来。给真正的遮罩元素设置 `pointerEvents: "auto"`，让它连滚轮也一起吞掉。
 </Callout>
 
-对应的中文要点：一个浮在无关滚动面板上方的绝对定位卡片会滚动那个面板。给真正的遮罩元素设置 `pointerEvents: "auto"`，让它连滚轮也一起吞掉。`<anchored>` 默认就会遮挡，并有独立的 `occlude` prop，因此菜单与 tooltip 两者都不需要。
+`<anchored>` 默认就会遮挡，并有独立的 `occlude` prop，因此菜单与 tooltip 两者都不需要自己处理这件事。
 
 <Callout type="note">
   `pointerEvents: "none"` 意味着该元素**不插入命中盒**，所以它不会挡住身后的任何东西。它并不会禁用同一元素上的监听器，也不会被继承，因此子元素仍保留自己的命中盒。

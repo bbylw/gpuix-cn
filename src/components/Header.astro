@@ -2,30 +2,43 @@
 import { Icon } from 'astro-icon/components'
 import Search from './Search'
 import ThemeToggle from './ThemeToggle'
+import { GITHUB_URL } from '../lib/site'
 
-const GITHUB = 'https://github.com/remorses/gpuix'
+interface Props {
+  /** 页面是否带移动端抽屉侧边栏。没有抽屉的页面不渲染汉堡按钮，避免出现点不动的死控件。 */
+  drawer?: boolean
+}
+
+const { drawer = false } = Astro.props
 ---
 
 <header
-  class="sticky top-0 z-60 h-16 border-b border-line bg-canvas"
+  class="sticky top-0 z-60 border-b border-line bg-canvas"
+  style="height: var(--header-h)"
+  data-drawer={drawer ? 'true' : undefined}
 >
   <!-- 阅读进度：CSS 滚动驱动，无 scroll 监听 -->
   <div class="read-progress" aria-hidden="true"></div>
 
   <div class="mx-auto flex h-full max-w-[104rem] items-center gap-3 px-4 sm:px-6">
-    <button
-      type="button"
-      data-nav-toggle
-      aria-label="打开导航"
-      aria-expanded="false"
-      class="-ml-1 inline-flex size-9 shrink-0 items-center justify-center rounded-[5px] text-ink-muted transition-colors hover:bg-surface hover:text-ink lg:hidden"
-    >
-      <Icon name="ph:list-bold" class="size-[18px]" />
-    </button>
+    {
+      drawer && (
+        <button
+          type="button"
+          data-nav-toggle
+          aria-label="打开导航"
+          aria-expanded="false"
+          aria-controls="docs-sidebar"
+          class="-ml-1 inline-flex size-9 shrink-0 items-center justify-center rounded-card text-ink-muted transition-colors hover:bg-surface hover:text-ink lg:hidden"
+        >
+          <Icon name="ph:list-bold" class="size-[18px]" />
+        </button>
+      )
+    }
 
     <a href="/" class="flex shrink-0 items-center gap-2.5" aria-label="GPUIX 首页">
       <span
-        class="grid size-6 place-items-center rounded-[5px] bg-accent font-mono text-[13px] leading-none font-bold text-accent-ink"
+        class="grid size-6 place-items-center rounded-card bg-accent font-mono text-[13px] leading-none font-bold text-accent-ink"
         >G</span
       >
       <span class="text-[0.9375rem] leading-none font-semibold tracking-[-0.01em] text-ink"
@@ -36,11 +49,11 @@ const GITHUB = 'https://github.com/remorses/gpuix'
     <div class="ml-auto flex items-center gap-1.5">
       <Search client:idle />
       <a
-        href={GITHUB}
+        href={GITHUB_URL}
         target="_blank"
         rel="noreferrer noopener"
         aria-label="在 GitHub 上查看 GPUIX 仓库"
-        class="inline-flex size-9 items-center justify-center rounded-[5px] text-ink-muted transition-colors hover:bg-surface hover:text-ink"
+        class="inline-flex size-9 items-center justify-center rounded-card text-ink-muted transition-colors hover:bg-surface hover:text-ink"
       >
         <Icon name="ph:github-logo" class="size-[18px]" />
       </a>
@@ -50,35 +63,69 @@ const GITHUB = 'https://github.com/remorses/gpuix'
 </header>
 
 <script>
-  // 移动端侧边栏抽屉
+  import { lockScroll, unlockScroll } from '../lib/scroll-lock'
+
+  // 移动端侧边栏抽屉。与滚动锁共用 src/lib/scroll-lock，避免和搜索对话框互相误解锁。
   const toggle = document.querySelector<HTMLButtonElement>('[data-nav-toggle]')
   const sidebar = document.getElementById('docs-sidebar')
   const backdrop = document.getElementById('sidebar-backdrop')
+  const DESKTOP = '(min-width: 1024px)'
+  const desktop = window.matchMedia(DESKTOP)
+  const HOLDER = 'header-drawer'
 
   function setSidebar(open: boolean) {
-    if (!sidebar || !toggle) return
-    sidebar.classList.toggle('-translate-x-full', !open)
-    sidebar.classList.toggle('translate-x-0', open)
-    backdrop?.classList.toggle('invisible', !open)
-    backdrop?.classList.toggle('visible', open)
-    backdrop?.classList.toggle('opacity-100', open)
-    backdrop?.classList.toggle('opacity-0', !open)
-    toggle.setAttribute('aria-expanded', String(open))
-    document.documentElement.style.overflow = open ? 'hidden' : ''
-    if (open) sidebar.querySelector<HTMLAnchorElement>('a')?.focus()
+    if (!sidebar) return
+
+    // 三种状态：桌面常驻 / 移动抽屉展开 / 移动抽屉收起。
+    // inert 只能在第三种状态下加 —— lg 以上侧边栏是可见的常规栏位，
+    // 给它加 inert 会禁掉整份桌面导航。
+    const expanded = open && !desktop.matches
+    const hidden = !expanded && !desktop.matches
+
+    sidebar.classList.toggle('-translate-x-full', hidden)
+    sidebar.classList.toggle('translate-x-0', !hidden)
+    // 收起时把整棵导航移出无障碍树与 Tab 序列，
+    // 否则键盘和读屏用户会遍历一屏看不见的链接。
+    sidebar.toggleAttribute('inert', hidden)
+
+    backdrop?.classList.toggle('invisible', !expanded)
+    backdrop?.classList.toggle('visible', expanded)
+    backdrop?.classList.toggle('opacity-100', expanded)
+    backdrop?.classList.toggle('opacity-0', !expanded)
+    backdrop?.toggleAttribute('inert', !expanded)
+
+    toggle?.setAttribute('aria-expanded', String(expanded))
+    toggle?.setAttribute('aria-label', expanded ? '关闭导航' : '打开导航')
+
+    if (expanded) {
+      lockScroll(HOLDER)
+      sidebar.querySelector<HTMLAnchorElement>('a')?.focus()
+    } else {
+      unlockScroll(HOLDER)
+    }
   }
 
-  toggle?.addEventListener('click', () => {
-    setSidebar(toggle.getAttribute('aria-expanded') !== 'true')
-  })
-  backdrop?.addEventListener('click', () => setSidebar(false))
-  sidebar?.addEventListener('click', (event) => {
-    if ((event.target as HTMLElement).closest('a')) setSidebar(false)
-  })
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') setSidebar(false)
-  })
-  window.addEventListener('resize', () => {
-    if (window.innerWidth >= 1024) setSidebar(false)
-  })
+  // 没有抽屉的页面（首页、404）不注册任何监听
+  if (toggle && sidebar) {
+    // 首帧同步一次：移动端默认收起，桌面端默认展开。
+    setSidebar(false)
+
+    toggle.addEventListener('click', () => {
+      setSidebar(toggle.getAttribute('aria-expanded') !== 'true')
+    })
+    backdrop?.addEventListener('click', () => setSidebar(false))
+    sidebar.addEventListener('click', (event) => {
+      if ((event.target as HTMLElement).closest('a')) setSidebar(false)
+    })
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return
+      // 搜索对话框盖在抽屉上时，Esc 已被它消费掉，不该顺手把抽屉也收掉。
+      // 只能看 defaultPrevented：React 的处理器跑在 document 之前，且会
+      // 同步卸载对话框，等事件冒泡上来时 querySelector 已经查不到它了。
+      if (event.defaultPrevented) return
+      setSidebar(false)
+    })
+    // 视口跨过 lg 时收起抽屉，锁与 inert 都要跟着解掉
+    desktop.addEventListener('change', () => setSidebar(false))
+  }
 </script>

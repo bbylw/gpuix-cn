@@ -26,5 +26,6 @@ bun-error.log*
 
 # 本地验证产物（无头浏览器截图 / 临时渲染文件）
 .playwright-cli/
+.playwright-mcp/
 .scratch/
 shot-*.png

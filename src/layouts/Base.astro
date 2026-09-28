@@ -1,14 +1,25 @@
 ---
 import '../styles/global.css'
+import { SITE_TITLE } from '../lib/site'
 
 interface Props {
   title: string
   description: string
-  /** 社交预览图，docs 页面用默认站内图 */
+  /** 社交预览图，默认用站内图 */
   ogImage?: string
+  /** 文档页是长文，社交平台按 article 渲染摘要更合适 */
+  ogType?: 'website' | 'article'
+  /** og:type=article 时附带的分类，用于 topic 标注 */
+  ogSection?: string
 }
 
-const { title, description, ogImage = '/og-default.png' } = Astro.props
+const {
+  title,
+  description,
+  ogImage = '/og-default.png',
+  ogType = 'website',
+  ogSection,
+} = Astro.props
 
 const canonical = new URL(Astro.url.pathname.replace(/\/$/, '') || '/', Astro.site)
 const socialImage = new URL(ogImage, Astro.site)
@@ -29,8 +40,10 @@ const socialImage = new URL(ogImage, Astro.site)
     <meta name="theme-color" content="#0b0c0e" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
 
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="GPUIX 中文文档" />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:site_name" content={SITE_TITLE} />
+    {ogSection && <meta property="article:section" content={ogSection} />}
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
@@ -46,7 +59,7 @@ const socialImage = new URL(ogImage, Astro.site)
     <link
       rel="alternate"
       type="application/rss+xml"
-      title="GPUIX 中文文档"
+      title={SITE_TITLE}
       href={new URL('rss.xml', Astro.site)}
     />
 
@@ -70,7 +83,7 @@ const socialImage = new URL(ogImage, Astro.site)
   <body class="min-h-dvh bg-canvas text-ink antialiased">
     <a
       href="#main"
-      class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-accent-ink"
+      class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-card focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-accent-ink"
     >
       跳到主要内容
     </a>

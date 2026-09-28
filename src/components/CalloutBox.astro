@@ -1,0 +1,24 @@
+---
+/**
+ * Callout 的版式，与 components/mdx/Callout.astro 保持一致，
+ * 供 .astro 页面复用（MDX 组件在 .astro 页面里不可用）。
+ * 只做 important 一种，因为站内只有首页用到它。
+ */
+import { Icon } from 'astro-icon/components'
+---
+
+<aside class="relative self-start rounded-r-card bg-canvas-subtle py-5 pr-5 pl-6">
+  <span aria-hidden="true" class="absolute inset-y-0 left-0 w-[2px] rounded-full bg-accent">
+  </span>
+  <div class="flex gap-2.5">
+    <Icon
+      name="ph:seal-check-fill"
+      class="mt-[0.2rem] size-4 shrink-0 text-accent"
+      aria-hidden="true"
+    />
+    <div class="min-w-0">
+      <slot name="label" />
+      <slot />
+    </div>
+  </div>
+</aside>

@@ -75,12 +75,12 @@ function Find() {
 
 ## 匹配规则
 
-Matches are **non-overlapping** and leftmost-first. Case-insensitive matching uses Unicode **lowercasing**, not full case folding, so `ﬀ` does not match `ff`. A word boundary is any code point that is not Unicode Alphabetic, a digit, or `_`.
+匹配之间**不重叠**，且从左往右取。不区分大小写用的是 Unicode **小写化**而非完整的大小写折叠，所以 `ﬀ` 不会匹配 `ff`。词边界是任何不属于 Unicode Alphabetic、数字或 `_` 的码点。
 
-A match never crosses a line, exactly like browser find. It **does** cross the several host nodes React creates for one interpolated line, which matters more than it sounds:
+一个匹配不会跨行，这一点和浏览器的查找完全一致。但它**会**跨过 React 为同一行插值创建的多个宿主节点 —— 这比听起来更重要：
 
 ```tsx
-// React makes 3 host text nodes here. `Hello Tommy` still matches.
+// 这里 React 产生了 3 个宿主文本节点，`Hello Tommy` 仍然算一次匹配。
 <div highlight={{ query: 'Hello Tommy' }}>
   <text>Hello {name}!</text>
 </div>

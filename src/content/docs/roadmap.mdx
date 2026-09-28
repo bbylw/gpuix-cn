@@ -6,30 +6,31 @@ eyebrow: 参考
 
 import Callout from '../../components/mdx/Callout.astro'
 import Feature from '../../components/mdx/Feature.astro'
+import FeatureList from '../../components/mdx/FeatureList.astro'
 
 ## 核心运行时
 
-<ul>
+<FeatureList>
   <Feature done>基于 mutation 协议的 React reconciler</Feature>
   <Feature done>通过 napi-rs 与 wasm-bindgen 实现的原子化 `applyBatch()` 变更传输</Feature>
   <Feature done>RetainedTree（Rust 侧元素存储）</Feature>
   <Feature done>样式映射（CSS 属性 → GPUI 样式方法）</Feature>
-</ul>
+</FeatureList>
 
 ## 事件与输入
 
-<ul>
+<FeatureList>
   <Feature done>鼠标事件（click、mouseDown、mouseUp、mouseMove、mouseEnter、mouseLeave）</Feature>
   <Feature done>外侧点击（`onMouseDownOutside`）</Feature>
   <Feature done>带 delta 与触摸相位的滚轮事件</Feature>
   <Feature done>键盘事件（keyDown、keyUp），带焦点管理</Feature>
   <Feature done>获得/失去焦点事件，自动创建 FocusHandle</Feature>
   <Feature done>原生文本输入与多行 textarea</Feature>
-</ul>
+</FeatureList>
 
 ## 布局与绘制
 
-<ul>
+<FeatureList>
   <Feature done>可滚动容器（`overflow: "scroll"`），带持久滚动状态</Feature>
   <Feature done>编程式滚动 API（`scrollTo`、`scrollToItem`、`scrollIntoView`、`getScrollOffset`）</Feature>
   <Feature done>虚拟列表（`<virtual-list>`）</Feature>
@@ -39,19 +40,19 @@ import Feature from '../../components/mdx/Feature.astro'
   <Feature done>原生 `motion.div` 过渡，带确定性帧捕获</Feature>
   <Feature done>`motion.div` 的 `AnimatePresence` 退场过渡</Feature>
   <Feature>Canvas 元素</Feature>
-</ul>
+</FeatureList>
 
 ## 文本能力
 
-<ul>
+<FeatureList>
   <Feature done>跨元素文本选区</Feature>
   <Feature done>文本高亮与搜索（`highlight`、`useTextSearch`）</Feature>
   <Feature done>无样式 Select、Combobox 与 Tooltip</Feature>
-</ul>
+</FeatureList>
 
 ## 窗口
 
-<ul>
+<FeatureList>
   <Feature done>窗口标题（`setWindowTitle`）</Feature>
   <Feature done>原生窗口控制（`minimizeWindow`、`zoomWindow`、`toggleFullscreen`）</Feature>
   <Feature done>窗口装饰（`titlebarTransparent`、`windowBackground`、红绿灯位置）</Feature>
@@ -62,17 +63,17 @@ import Feature from '../../components/mdx/Feature.astro'
   <Feature done>调试边框浮层（`debugFrameOverlay` / `setDebugFrameOverlay`）</Feature>
   <Feature>应用声明的菜单与菜单回调</Feature>
   <Feature>多窗口</Feature>
-</ul>
+</FeatureList>
 
 ## 开发体验
 
-<ul>
+<FeatureList>
   <Feature done>带截图的 GPU 支撑测试渲染器</Feature>
   <Feature done>独立构建（锁定 GPUI 平台依赖）</Feature>
   <Feature done>`bun --hot` 下的 JS 重挂载（`render()` 保留原生窗口）</Feature>
   <Feature>原生 `.node` 插件的热重载。`bun run dev` 会重新编译并重启。原生模块无法卸载。</Feature>
   <Feature>`bun --hot` 期间的 React Refresh（需要 Bun 运行时转换）</Feature>
-</ul>
+</FeatureList>
 
 ## 已知限制
 

@@ -14,7 +14,8 @@ const items = headings.filter((h) => h.depth === 2 || h.depth === 3)
 {
   items.length > 0 && (
     <nav aria-label="本页目录" class="text-[13px]">
-      <h2 class="label-mono mb-2.5 pl-3.5">本页内容</h2>
+      {/* 分组名是导航标签，不进文档大纲，因此用 p 而不是 h2 */}
+      <p class="label-mono mb-2.5 pl-3.5">本页内容</p>
       <ul class="border-l border-line" data-toc>
         {items.map((heading) => (
           <li>
@@ -38,13 +39,29 @@ const items = headings.filter((h) => h.depth === 2 || h.depth === 3)
 }
 
 <script>
-  function markActive(links: Map<string, HTMLAnchorElement>) {
-    const offset = window.scrollY + 120
+  /**
+   * 目录高亮。
+   *
+   * 让位距离从 CSS 变量 --header-offset 读，而不是在 JS 里另写一个数字：
+   * 顶栏高度在 global.css 里改一处，这里自动跟上。
+   */
+  function offsetPx(): number {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--header-offset')
+    const value = Number.parseFloat(raw)
+    if (Number.isFinite(value)) {
+      // rem 需要换算成 px；写成 px 时直接返回
+      return raw.trim().endsWith('rem') ? value * 16 : value
+    }
+    // 读不到就退回顶栏高度，宁可高亮偏早也不要整块失效
+    return document.querySelector('header')?.getBoundingClientRect().height ?? 0
+  }
+
+  function markActive(links: Map<string, HTMLAnchorElement>, offset: number) {
     let current: string | null = null
     for (const slug of links.keys()) {
       const el = document.getElementById(slug)
       if (!el) continue
-      if (el.getBoundingClientRect().top + window.scrollY <= offset) current = slug
+      if (el.getBoundingClientRect().top <= offset) current = slug
       else break
     }
     for (const [slug, link] of links) {
@@ -53,7 +70,13 @@ const items = headings.filter((h) => h.depth === 2 || h.depth === 3)
     }
   }
 
+  let observer: IntersectionObserver | null = null
+
   function initToc() {
+    // 上一次可能留下了 observer，先断开再重建，避免观察目标越积越多
+    observer?.disconnect()
+    observer = null
+
     const links = new Map(
       [...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')].map((a) => [
         a.dataset.tocLink!,
@@ -67,8 +90,9 @@ const items = headings.filter((h) => h.depth === 2 || h.depth === 3)
       .filter((el): el is HTMLElement => el !== null)
 
     const visible = new Set<string>()
+    const offset = offsetPx()
 
-    const observer = new IntersectionObserver(
+    observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) visible.add(entry.target.id)
@@ -84,15 +108,17 @@ const items = headings.filter((h) => h.depth === 2 || h.depth === 3)
             return
           }
         }
-        markActive(links)
+        markActive(links, offset)
       },
-      { rootMargin: '-72px 0px -70% 0px', threshold: [0, 1] },
+      { rootMargin: `-${offset}px 0px -70% 0px`, threshold: [0, 1] },
     )
 
-    headings.forEach((h) => observer.observe(h))
-    markActive(links)
+    headings.forEach((h) => observer?.observe(h))
+    markActive(links, offset)
   }
 
   initToc()
-  document.addEventListener('astro:page-load', initToc)
+
+  // 视口高度变化会改变「哪一节在视口内」的判定
+  window.addEventListener('resize', initToc, { passive: true })
 </script>

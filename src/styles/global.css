@@ -38,17 +38,10 @@
   --color-accent-ink: #fdfdfd;
   --color-on-accent-soft: #8c3009;
 
+  /* 语义色只出现在 Callout 的图标、标签、左侧竖线，以及复制按钮的成功 / 失败反馈 */
   --color-green: #17693c;
-  --color-green-soft: #e2f1e8;
-  --color-on-green-soft: #14532f;
-
   --color-amber: #8a5206;
-  --color-amber-soft: #f7ecd9;
-  --color-on-amber-soft: #6f4206;
-
   --color-rose: #a5243c;
-  --color-rose-soft: #f8e3e7;
-  --color-on-rose-soft: #83172c;
 
   --font-sans:
     system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC',
@@ -57,11 +50,25 @@
     ui-monospace, 'SFMono-Regular', 'Cascadia Mono', 'JetBrains Mono', Menlo, Consolas,
     'Noto Sans Mono', monospace;
 
-  /* 一个圆角档位，全站共用 */
+  /* 圆角只有一个箱型档位：按钮、卡片、代码框、输入框、导航项共用它。
+     4px 只给行内 code / kbd 这类嵌在文字流里的小片；药丸与圆点用 rounded-full。 */
   --radius-card: 0.375rem;
+  --radius-chip: 0.25rem;
 
-  --shadow-card: 0 1px 2px rgb(22 23 26 / 0.05), 0 1px 1px rgb(22 23 26 / 0.04);
+  /* 顶栏高度是全站唯一的几何常量：sticky 侧边栏、目录 sticky、锚点滚动的让位距离
+     全部从它派生。改这里即可，不必再逐处对齐。 */
+  --header-h: 4rem;
+  /* 顶栏 + 一点呼吸空间，scroll-padding 与目录 sticky 用它。 */
+  --header-offset: 5.5rem;
+
   --shadow-pop: 0 18px 40px -18px rgb(22 23 26 / 0.28), 0 2px 8px -2px rgb(22 23 26 / 0.12);
+
+  /* 图片卡上的文字。卡片内容是一张深色帧缓冲截图，文字永远压在深底上，
+     因此这组值不随 .dark 翻转 —— 它们描述的是图片，不是页面。 */
+  --color-on-media: #f4f4f5;
+  --color-on-media-muted: #aeb3ba;
+  --color-on-media-accent: #f58a4b;
+  --color-on-media-scrim: #0b0c0e;
 
   --text-hero: clamp(2.05rem, 1.15rem + 3.1vw, 3.35rem);
   --text-title: clamp(1.45rem, 1.05rem + 1.3vw, 2rem);
@@ -91,18 +98,9 @@
   --color-on-accent-soft: #f5a97a;
 
   --color-green: #56b57f;
-  --color-green-soft: #10231a;
-  --color-on-green-soft: #7fc9a0;
-
   --color-amber: #d9a55e;
-  --color-amber-soft: #251a0d;
-  --color-on-amber-soft: #e3bd85;
-
   --color-rose: #e2758c;
-  --color-rose-soft: #2a1118;
-  --color-on-rose-soft: #eb9aab;
 
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5);
   --shadow-pop: 0 20px 44px -18px rgb(0 0 0 / 0.75), 0 2px 10px -2px rgb(0 0 0 / 0.5);
 }
 
@@ -117,7 +115,7 @@
 
   html {
     scroll-behavior: smooth;
-    scroll-padding-top: 5.5rem;
+    scroll-padding-top: var(--header-offset);
     -webkit-text-size-adjust: 100%;
   }
 
@@ -132,7 +130,6 @@
   :focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
-    border-radius: 3px;
   }
 
   ::selection {
@@ -140,7 +137,7 @@
   }
 
   :is(h2, h3, h4) {
-    scroll-margin-top: 6rem;
+    scroll-margin-top: var(--header-offset);
   }
 }
 
@@ -188,13 +185,6 @@
   background-clip: content-box;
 }
 
-.scrollbar-none {
-  scrollbar-width: none;
-}
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-
 /* ==========================================================================
    排版 —— 文档正文
    ========================================================================== */
@@ -221,7 +211,7 @@
     margin-top: 2.9em;
     margin-bottom: 0.2em;
     padding-left: 0.75em;
-    scroll-margin-top: 6rem;
+    scroll-margin-top: var(--header-offset);
   }
 
   .prose-doc h2::before {
@@ -242,7 +232,7 @@
     letter-spacing: -0.008em;
     margin-top: 2.2em;
     margin-bottom: 0.1em;
-    scroll-margin-top: 6rem;
+    scroll-margin-top: var(--header-offset);
   }
 
   .prose-doc h4 {
@@ -251,7 +241,7 @@
     font-weight: 660;
     margin-top: 1.8em;
     margin-bottom: 0.1em;
-    scroll-margin-top: 6rem;
+    scroll-margin-top: var(--header-offset);
   }
 
   .prose-doc h2 + *,
@@ -282,7 +272,7 @@
     font-family: var(--font-mono);
     font-size: 0.855em;
     padding: 0.15em 0.38em;
-    border-radius: 4px;
+    border-radius: var(--radius-chip);
     background-color: var(--color-surface);
     color: var(--color-ink);
     border: 1px solid var(--color-line);
@@ -394,7 +384,8 @@
   background-color: var(--color-canvas-subtle);
 }
 
-.prose-doc .code-frame pre,
+/* Astro 7 不再输出 <figure class="astro-code"> 包裹层，代码块就是裸 <pre> */
+.code-frame pre,
 .prose-doc figure.astro-code {
   margin: 0;
 }
@@ -436,7 +427,7 @@
   align-items: center;
   gap: 0.3rem;
   padding: 0.2rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   font-size: 0.6875rem;
   font-family: var(--font-sans);
   color: var(--color-ink-muted);
@@ -533,9 +524,6 @@
   }
   .rise-3 {
     animation-delay: 0.2s;
-  }
-  .rise-4 {
-    animation-delay: 0.28s;
   }
 }
 

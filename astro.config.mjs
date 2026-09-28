@@ -7,11 +7,11 @@ import icon from 'astro-icon'
 import tailwindcss from '@tailwindcss/vite'
 
 import { docsNav } from './src/lib/nav'
-
-const site = 'https://gpuix.dev'
+import { codeThemes } from './src/lib/shiki'
+import { SITE_URL } from './src/lib/site'
 
 export default defineConfig({
-  site,
+  site: SITE_URL,
   trailingSlash: 'never',
   output: 'static',
   integrations: [
@@ -35,10 +35,7 @@ export default defineConfig({
   ],
   markdown: {
     shikiConfig: {
-      themes: {
-        light: 'vitesse-light',
-        dark: 'vitesse-dark',
-      },
+      themes: codeThemes,
       defaultColor: false,
       wrap: true,
     },

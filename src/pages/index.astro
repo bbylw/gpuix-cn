@@ -2,14 +2,18 @@
 import Base from '../layouts/Base.astro'
 import Header from '../components/Header.astro'
 import CodeEnhance from '../components/CodeEnhance.astro'
+import NavGroups from '../components/NavGroups.astro'
+import CalloutBox from '../components/CalloutBox.astro'
 import { Icon } from 'astro-icon/components'
 import { Code } from 'astro:components'
 import { Image } from 'astro:assets'
 import surface from '../assets/framebuffer-surface.png'
 import { docsNav } from '../lib/nav'
+import { codeThemes } from '../lib/shiki'
+import { GITHUB_URL, LICENSE_URL, GPUI_URL, QUICK_START_HREF } from '../lib/site'
 
-const GITHUB = 'https://github.com/remorses/gpuix'
-const GPUI = 'https://github.com/zed-industries/zed/tree/main/crates/gpui'
+// 首页的 <Code> 不会自动继承 markdown.shikiConfig，必须显式给同一份主题
+const shiki = { themes: codeThemes, defaultColor: false as const }
 
 const heroCode = `import { useState } from 'react'
 import { render } from '@gpuix/react'
@@ -81,15 +85,15 @@ const metrics = [
           </p>
           <div class="rise rise-3 mt-9 flex flex-wrap items-center gap-3">
             <a
-              href="/docs/quick-start"
-              class="inline-flex h-11 items-center gap-2 rounded-[6px] bg-accent px-5 text-sm font-medium text-accent-ink transition-colors hover:bg-accent-hover active:translate-y-[1px]"
+              href={QUICK_START_HREF}
+              class="inline-flex h-11 items-center gap-2 rounded-card bg-accent px-5 text-sm font-medium text-accent-ink transition-colors hover:bg-accent-hover active:translate-y-[1px]"
             >
               开始使用
               <Icon name="ph:arrow-right-bold" class="size-4" aria-hidden="true" />
             </a>
             <a
               href="/docs/architecture"
-              class="inline-flex h-11 items-center rounded-[6px] border border-line-strong px-5 text-sm font-medium text-ink transition-colors hover:bg-surface active:translate-y-[1px]"
+              class="inline-flex h-11 items-center rounded-card border border-line-strong px-5 text-sm font-medium text-ink transition-colors hover:bg-surface active:translate-y-[1px]"
             >
               看它怎么工作
             </a>
@@ -102,7 +106,13 @@ const metrics = [
               <span class="code-lang">app.tsx</span>
               <span class="label-mono">一个文件的全部</span>
             </div>
-            <Code code={heroCode} lang="tsx" class="scroll-slim overflow-auto px-4 py-3.5 text-[12.5px]" />
+            <Code
+              code={heroCode}
+              lang="tsx"
+              themes={shiki.themes}
+              defaultColor={shiki.defaultColor}
+              class="scroll-slim overflow-auto px-4 py-3.5 text-[12.5px]"
+            />
           </div>
         </div>
       </div>
@@ -118,14 +128,14 @@ const metrics = [
         </h2>
         <p class="mt-3 max-w-[58ch] text-pretty leading-relaxed text-ink-muted">
           <a
-            href={GPUI}
+              href={GPUI_URL}
             target="_blank"
             rel="noreferrer noopener"
             class="underline decoration-line-strong underline-offset-4 transition-colors hover:text-ink"
             >GPUI</a
           >{" "}
           是 Zed 编辑器用来绘制自己的那套 GPU UI 框架。GPUIX 把 JSX 接到它的元素协议上，所以
-          <code class="rounded-[4px] bg-surface px-1.5 py-0.5 font-mono text-[0.85em]">hover</code>
+          <code class="rounded-chip bg-surface px-1.5 py-0.5 font-mono text-[0.85em]">hover</code>
           之类的样式写在 Rust 里，而不是 CSS 里。
         </p>
 
@@ -174,7 +184,7 @@ const metrics = [
 
         <div class="mt-10 grid gap-4 lg:grid-cols-6">
           <!-- A：大图块 -->
-          <div class="relative min-h-[19rem] overflow-hidden rounded-[6px] bg-canvas lg:col-span-4 lg:row-span-2">
+          <div class="relative min-h-[19rem] overflow-hidden rounded-card bg-canvas lg:col-span-4 lg:row-span-2">
             <Image
               src={surface}
               alt=""
@@ -182,28 +192,25 @@ const metrics = [
               height={1024}
               class="absolute inset-0 size-full object-cover"
             />
+            {/* 图片本身是深色帧缓冲，文字必须压在深底上才读得出来，
+                因此遮罩用 on-media-scrim 而不是随主题翻转的 canvas。 */}
             <div
-              class="absolute inset-0 bg-gradient-to-r from-[#0b0c0e] from-30% via-[#0b0c0e]/55 to-transparent"
-              aria-hidden="true"
-            >
-            </div>
-            <div
-              class="absolute inset-0 bg-gradient-to-t from-[#0b0c0e] via-[#0b0c0e]/30 to-transparent"
+              class="absolute inset-0 bg-linear-to-t from-on-media-scrim/95 via-on-media-scrim/55 to-transparent"
               aria-hidden="true"
             >
             </div>
             <div class="relative flex h-full flex-col justify-end p-6 sm:p-8">
-              <h3 class="text-xl font-semibold tracking-[-0.015em] text-[#f4f4f5]">
+              <h3 class="text-xl font-semibold tracking-[-0.015em] text-on-media">
                 真正的 GPU 渲染
               </h3>
-              <p class="mt-2 max-w-[38ch] text-[14.5px] leading-relaxed text-pretty text-[#aeb3ba]">
+              <p class="mt-2 max-w-[38ch] text-[14.5px] leading-relaxed text-pretty text-on-media-muted">
                 组件树直接变成 GPUI 元素，由 Metal、DirectX 或 Vulkan 提交到屏幕。裁剪、合成、
                 文本光栅化都在原生侧，DOM 一次都不参与。
               </p>
               <p class="label-mono mt-4">
                 <a
                   href="/docs/architecture"
-                  class="inline-flex items-center gap-1.5 text-[#f58a4b] transition-opacity hover:opacity-80"
+                  class="inline-flex items-center gap-1.5 text-on-media-accent transition-opacity hover:opacity-80"
                 >
                   读架构说明
                   <Icon name="ph:caret-right-bold" class="size-3.5" aria-hidden="true" />
@@ -213,7 +220,7 @@ const metrics = [
           </div>
 
           <!-- B -->
-          <div class="rounded-[6px] border border-line bg-canvas-subtle p-6 lg:col-span-2">
+          <div class="rounded-card border border-line bg-canvas-subtle p-6 lg:col-span-2">
             <h3 class="text-[0.9375rem] font-semibold text-ink">原生动画</h3>
             <p class="mt-2 text-[14px] leading-relaxed text-pretty text-ink-muted">
               React 只发一次目标值，Rust 计算中间帧并自己请求刷新。每一帧都不触发一次 React
@@ -222,7 +229,7 @@ const metrics = [
           </div>
 
           <!-- C -->
-          <div class="rounded-[6px] border border-line bg-canvas-subtle p-6 lg:col-span-2">
+          <div class="rounded-card border border-line bg-canvas-subtle p-6 lg:col-span-2">
             <h3 class="text-[0.9375rem] font-semibold text-ink">React 与 Solid 皆可</h3>
             <p class="mt-2 text-[14px] leading-relaxed text-pretty text-ink-muted">
               两套运行时，同一套元素协议。
@@ -237,30 +244,30 @@ const metrics = [
           </div>
 
           <!-- D -->
-          <div class="rounded-[6px] border border-line bg-canvas-subtle p-6 lg:col-span-3">
+          <div class="rounded-card border border-line bg-canvas-subtle p-6 lg:col-span-3">
             <h3 class="text-[0.9375rem] font-semibold text-ink">虚拟列表</h3>
             <p class="mt-2 text-[14px] leading-relaxed text-pretty text-ink-muted">
               React 与 Rust 保留全部行，GPUI 只构建靠近视口的那几行。行高可以各不相同，你不必先声明。
             </p>
             <div class="mt-5 flex items-center gap-2" role="img" aria-label="只有视口内的两行被真正构建">
               <span class="flex-1 space-y-1">
-                <span class="block h-1.5 rounded-[2px] border border-line"></span>
-                <span class="block h-1.5 rounded-[2px] border border-line"></span>
+                <span class="block h-1.5 rounded-chip border border-line"></span>
+                <span class="block h-1.5 rounded-chip border border-line"></span>
               </span>
               <span class="flex-1 space-y-1">
-                <span class="block h-1.5 rounded-[2px] bg-accent"></span>
-                <span class="block h-1.5 rounded-[2px] bg-accent"></span>
+                <span class="block h-1.5 rounded-chip bg-accent"></span>
+                <span class="block h-1.5 rounded-chip bg-accent"></span>
               </span>
               <span class="flex-1 space-y-1">
-                <span class="block h-1.5 rounded-[2px] border border-line"></span>
-                <span class="block h-1.5 rounded-[2px] border border-line"></span>
+                <span class="block h-1.5 rounded-chip border border-line"></span>
+                <span class="block h-1.5 rounded-chip border border-line"></span>
               </span>
             </div>
             <p class="label-mono mt-2">实心 = 视口内，真正被构建并绘制的行</p>
           </div>
 
           <!-- E -->
-          <div class="rounded-[6px] border border-line bg-canvas-subtle p-6 lg:col-span-3">
+          <div class="rounded-card border border-line bg-canvas-subtle p-6 lg:col-span-3">
             <h3 class="text-[0.9375rem] font-semibold text-ink">可选中的原生文本</h3>
             <p class="mt-2 text-[14px] leading-relaxed text-pretty text-ink-muted">
               文本由 GPUI 排版，因此可以跨元素选中、复制，带语法高亮，也能做搜索高亮。
@@ -271,13 +278,15 @@ const metrics = [
 <code lang="rust">{src}</code>
 <diff patch={patch} />`}
                 lang="tsx"
+                themes={shiki.themes}
+                defaultColor={shiki.defaultColor}
                 class="overflow-x-auto px-3.5 py-3 text-[12.5px]"
               />
             </div>
           </div>
 
           <!-- F -->
-          <div class="rounded-[6px] border border-line bg-canvas-subtle p-6 lg:col-span-6">
+          <div class="rounded-card border border-line bg-canvas-subtle p-6 lg:col-span-6">
             <div class="grid gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-center">
               <div>
                 <h3 class="text-[0.9375rem] font-semibold text-ink">像 Playwright 一样测试</h3>
@@ -292,6 +301,8 @@ const metrics = [
 await button.click()
 expect(await driver.screenshot()).toMatchFile('counter.png')`}
                   lang="ts"
+                  themes={shiki.themes}
+                  defaultColor={shiki.defaultColor}
                   class="overflow-x-auto px-3.5 py-3 text-[12.5px]"
                 />
               </div>
@@ -329,27 +340,20 @@ expect(await driver.screenshot()).toMatchFile('counter.png')`}
           </ol>
         </div>
 
-        <div class="relative self-start rounded-r-[5px] bg-canvas-subtle py-5 pr-5 pl-6">
-          <span aria-hidden="true" class="absolute inset-y-0 left-0 w-[2px] rounded-full bg-accent">
-          </span>
-          <div class="flex gap-2.5">
-            <Icon name="ph:seal-check-fill" class="mt-[0.2rem] size-4 shrink-0 text-accent" aria-hidden="true" />
-            <div class="min-w-0">
-              <p class="mb-1 text-[12px] font-semibold text-accent">最容易踩的坑</p>
-              <p class="text-[14.5px] leading-relaxed text-pretty text-ink-soft">
-                给每一处 <code class="rounded-[4px] border border-line bg-surface px-1.5 py-0.5 font-mono text-[0.85em]">&lt;text&gt;</code>
-                都设置 color。GPUI 不从父元素继承 color，没有颜色的文本会被画成黑色，在深色表面上直接消失。
-              </p>
-              <a
-                href="/docs/elements"
-                class="mt-3 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-accent transition-opacity hover:opacity-80"
-              >
-                查看全部宿主元素
-                <Icon name="ph:caret-right-bold" class="size-3.5" aria-hidden="true" />
-              </a>
-            </div>
-          </div>
-        </div>
+        <CalloutBox>
+          <p slot="label" class="mb-1 text-[12px] font-semibold text-accent">最容易踩的坑</p>
+          <p class="text-[14.5px] leading-relaxed text-pretty text-ink-soft">
+            给每一处 <code class="rounded-chip border border-line bg-surface px-1.5 py-0.5 font-mono text-[0.85em]">&lt;text&gt;</code>
+            都设置 color。GPUI 不从父元素继承 color，没有颜色的文本会被画成黑色，在深色表面上直接消失。
+          </p>
+          <a
+            href="/docs/elements"
+            class="mt-3 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-accent transition-opacity hover:opacity-80"
+          >
+            查看全部宿主元素
+            <Icon name="ph:caret-right-bold" class="size-3.5" aria-hidden="true" />
+          </a>
+        </CalloutBox>
       </div>
     </section>
 
@@ -364,36 +368,13 @@ expect(await driver.screenshot()).toMatchFile('counter.png')`}
           </h2>
           <p class="label-mono">
             {docsNav.reduce((n, group) => n + group.items.length, 0)} 篇 · 按
-            {docsNav.length} 组组织 · 按 <kbd class="rounded-[4px] border border-line bg-surface px-1.5 py-0.5">⌘K</kbd>
+            {docsNav.length} 组组织 · 按 <kbd class="rounded-chip border border-line bg-surface px-1.5 py-0.5">⌘K</kbd>
             搜任何 API 名称
           </p>
         </div>
 
         <div class="mt-10 columns-1 gap-x-14 sm:columns-2 lg:columns-4">
-          {
-            docsNav.map((group) => (
-              <div class="mb-9 break-inside-avoid">
-                <h3 class="label-mono mb-2.5">{group.title}</h3>
-                <ul>
-                  {group.items.map((item) => (
-                    <li>
-                      <a
-                        href={item.href}
-                        class="group flex items-baseline gap-2 py-[5px] text-[13.5px] text-ink-muted transition-colors hover:text-ink"
-                      >
-                        <span class="flex-1">{item.title}</span>
-                        <Icon
-                          name="ph:arrow-right"
-                          class="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                          aria-hidden="true"
-                        />
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))
-          }
+          <NavGroups variant="inline" />
         </div>
       </div>
     </section>
@@ -406,7 +387,7 @@ expect(await driver.screenshot()).toMatchFile('counter.png')`}
       <p>
         内容整理自 GPUIX 官方 README ·
         <a
-          href="https://github.com/remorses/gpuix/blob/main/LICENSE"
+          href={LICENSE_URL}
           target="_blank"
           rel="noreferrer noopener"
           class="ml-1 text-ink-muted underline decoration-line underline-offset-4 transition-colors hover:text-accent"
@@ -414,10 +395,10 @@ expect(await driver.screenshot()).toMatchFile('counter.png')`}
         >
       </p>
       <p class="flex items-center gap-5">
-        <a href="/docs/quick-start" class="transition-colors hover:text-ink">快速开始</a>
+        <a href={QUICK_START_HREF} class="transition-colors hover:text-ink">快速开始</a>
         <a href="/docs/roadmap" class="transition-colors hover:text-ink">实现状态</a>
         <a
-          href={GITHUB}
+          href={GITHUB_URL}
           target="_blank"
           rel="noreferrer noopener"
           class="transition-colors hover:text-ink"

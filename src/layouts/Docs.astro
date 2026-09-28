@@ -6,6 +6,7 @@ import Sidebar from '../components/Sidebar.astro'
 import Toc from '../components/Toc.astro'
 import CodeEnhance from '../components/CodeEnhance.astro'
 import type { NavItem } from '../lib/nav'
+import { SITE_TITLE } from '../lib/site'
 
 interface Props {
   title: string
@@ -19,8 +20,13 @@ interface Props {
 const { title, description, headings, eyebrow, prev, next } = Astro.props
 ---
 
-<Base title={`${title} - GPUIX 中文文档`} description={description}>
-  <Header />
+<Base
+  title={`${title} - ${SITE_TITLE}`}
+  description={description}
+  ogType="article"
+  ogSection={eyebrow}
+>
+  <Header drawer />
   <div class="mx-auto flex max-w-[104rem]">
     <Sidebar />
 
@@ -50,7 +56,7 @@ const { title, description, headings, eyebrow, prev, next } = Astro.props
               prev ? (
                 <a
                   href={prev.href}
-                  class="group flex flex-col gap-1 rounded-[6px] border border-line p-4 transition-colors hover:border-line-strong hover:bg-canvas-subtle"
+                  class="group flex flex-col gap-1 rounded-card border border-line p-4 transition-colors hover:border-line-strong hover:bg-canvas-subtle"
                 >
                   <span class="label-mono">上一页</span>
                   <span class="text-[0.9375rem] font-medium text-ink">{prev.title}</span>
@@ -63,7 +69,7 @@ const { title, description, headings, eyebrow, prev, next } = Astro.props
               next && (
                 <a
                   href={next.href}
-                  class="group flex flex-col items-end gap-1 rounded-[6px] border border-line p-4 transition-colors hover:border-line-strong hover:bg-canvas-subtle sm:col-start-2"
+                  class="group flex flex-col items-end gap-1 rounded-card border border-line p-4 transition-colors hover:border-line-strong hover:bg-canvas-subtle sm:col-start-2"
                 >
                   <span class="label-mono">下一页</span>
                   <span class="text-[0.9375rem] font-medium text-ink">{next.title}</span>
@@ -74,7 +80,10 @@ const { title, description, headings, eyebrow, prev, next } = Astro.props
         </article>
 
         <aside class="hidden w-56 shrink-0 xl:block">
-          <div class="sticky top-[5.5rem] max-h-[calc(100dvh-7.5rem)] overflow-y-auto pr-1 pb-8 scroll-slim">
+          <div
+            class="scroll-slim sticky overflow-y-auto pr-1 pb-8"
+            style="top: var(--header-offset); max-height: calc(100dvh - var(--header-offset) - 2rem)"
+          >
             <Toc headings={headings} />
           </div>
         </aside>

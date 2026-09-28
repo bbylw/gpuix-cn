@@ -14,7 +14,11 @@ interface Props {
 
 const { type = 'note', title } = Astro.props
 
-const styles: Record<string, { rule: string; tone: string; icon: string; label: string }> = {
+type CalloutType = NonNullable<Props['type']>
+
+// 键与 type 联合类型绑定，拼错会在 astro check 里报错，
+// 而不是静默退回 note 样式。
+const styles: Record<CalloutType, { rule: string; tone: string; icon: string; label: string }> = {
   note: { rule: 'bg-line-strong', tone: 'text-ink-muted', icon: 'ph:info', label: '说明' },
   tip: { rule: 'bg-green', tone: 'text-green', icon: 'ph:lightbulb', label: '提示' },
   important: {
@@ -27,10 +31,10 @@ const styles: Record<string, { rule: string; tone: string; icon: string; label: 
   danger: { rule: 'bg-rose', tone: 'text-rose', icon: 'ph:x-circle', label: '警告' },
 }
 
-const style = styles[type] ?? styles.note
+const style = styles[type]
 ---
 
-<aside class="relative my-6 rounded-r-[5px] bg-canvas-subtle py-3.5 pr-4 pl-5">
+<aside class="relative my-6 rounded-r-card bg-canvas-subtle py-3.5 pr-4 pl-5">
   <span
     aria-hidden="true"
     class:list={['absolute inset-y-0 left-0 w-[2px] rounded-full', style.rule]}

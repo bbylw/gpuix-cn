@@ -4,7 +4,8 @@ import { getCollection, render } from 'astro:content'
 import Docs from '../../layouts/Docs.astro'
 import Callout from '../../components/mdx/Callout.astro'
 import Feature from '../../components/mdx/Feature.astro'
-import { flatNav, docsNav, type NavItem } from '../../lib/nav'
+import FeatureList from '../../components/mdx/FeatureList.astro'
+import { flatNav, type NavItem } from '../../lib/nav'
 
 export const getStaticPaths = (async () => {
   const docs = await getCollection('docs')
@@ -12,34 +13,27 @@ export const getStaticPaths = (async () => {
   return docs.map((entry) => {
     const href = `/docs/${entry.id}`
 
-    // 显式声明优先，否则按 nav.ts 的登记顺序推导上一篇 / 下一篇
-    let index = flatNav.findIndex((item) => item.href === href)
-    if (index === -1) {
-      const group = docsNav.find((g) => g.items.some((i) => i.href === href))
-      if (group) {
-        const within = group.items.findIndex((i) => i.href === href)
-        const globalIndex = flatNav.findIndex((i) => i.href === href)
-        index = globalIndex === -1 ? within : globalIndex
-      }
-    }
-
-    const fallbackPrev: NavItem | undefined = index > 0 ? flatNav[index - 1] : undefined
-    const fallbackNext: NavItem | undefined =
-      index >= 0 && index < flatNav.length - 1 ? flatNav[index + 1] : undefined
+    // nav.ts 是唯一的顺序来源：frontmatter 显式声明优先，否则按 flatNav 推导。
+    // 注意 index 是全局下标，不能退化成组内下标 —— 那会串到隔壁分组。
+    const index = flatNav.findIndex((item) => item.href === href)
+    const inNav = index !== -1
+    const prev: NavItem | undefined = entry.data.prev ?? (index > 0 ? flatNav[index - 1] : undefined)
+    const next: NavItem | undefined =
+      entry.data.next ?? (inNav && index < flatNav.length - 1 ? flatNav[index + 1] : undefined)
 
     return {
       params: { slug: entry.id },
-      props: {
-        entry,
-        prev: entry.data.prev ?? fallbackPrev,
-        next: entry.data.next ?? fallbackNext,
-      },
+      props: { entry, prev, next },
     }
   })
 }) satisfies GetStaticPaths
 
 const { entry, prev, next } = Astro.props
 const { Content, headings } = await render(entry)
+
+// 显式在正文里 import MDX 组件的文档不需要这份映射；
+// 未 import 就能用的那几篇依赖它。两者并存，map 只是兜底。
+const needsMdxMap = /\b(Callout|Feature|FeatureList)\b/.test(entry.body ?? '')
 ---
 
 <Docs
@@ -50,5 +44,5 @@ const { Content, headings } = await render(entry)
   prev={prev}
   next={next}
 >
-  <Content components={{ Callout, Feature }} />
+  <Content components={needsMdxMap ? { Callout, Feature, FeatureList } : {}} />
 </Docs>

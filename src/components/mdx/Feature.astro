@@ -1,5 +1,5 @@
 ---
-/** 实现状态清单中的一项。 */
+/** 实现状态清单中的一项。必须放在 <FeatureList> 里。 */
 import { Icon } from 'astro-icon/components'
 
 interface Props {
@@ -9,7 +9,7 @@ interface Props {
 const { done = false } = Astro.props
 ---
 
-<li class="flex list-none items-start gap-2 !mt-2">
+<li class="flex list-none items-start gap-2">
   <Icon
     name={done ? 'ph:check-circle-fill' : 'ph:circle-dashed'}
     class:list={['mt-[0.2rem] size-[15px] shrink-0', done ? 'text-green' : 'text-line-strong']}
