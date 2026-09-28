@@ -1,0 +1,120 @@
+---
+title: 原生文本组件
+description: '三个在 Rust 侧完成排版与着色的元素，以及如何用 theme 重新调校而无需重新构建。'
+eyebrow: 组件
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+有三个元素会使用在 Rust 中计算得到的 Syntect 语法高亮来渲染文本。颜色来自一个主题属性，因此晚到的高亮可以在不改变布局的前提下为各个片段重新着色。
+
+## `<code>`
+
+一个带语法高亮的代码块。每行一行、行高为精确值，因此在高亮运行之前，该块的高度就已经确定。
+
+```tsx
+<code
+  code={source}
+  language="typescript"        // 或 path="src/app.ts" 以从扩展名推断
+  showLineNumbers
+  style={{
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ffffff1f',
+    backgroundColor: '#ffffff09',
+  }}
+/>
+```
+
+`style` 中的 `fontFamily`、`fontSize`、`fontWeight`、`lineHeight` 与 `color` 会覆盖主题。行高是固定的，因此仅靠 `fontSize` 会按主题的比例缩放该高度；传入 `lineHeight` 则可以精确设定。
+
+<Callout type="important" title="code 不绘制任何属于自己的表面">
+  没有填充、边框、圆角、内边距，也没有语言头部。`style` 就是那个表面，因此卡片外观由你决定。
+
+  此外它还有两件事仍由自己负责：行**永不换行**，且该块本身就是自己的水平滚动器。长行会在其内部的水平滚轮下平移，因此 `style` 中的 `whiteSpace` 与 `overflowX` 不起作用。
+</Callout>
+
+要加一个语言头部，或任何其他装饰，请把它包进一个你自己的 `<div>`：
+
+```tsx
+<div style={{ display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden' }}>
+  <div style={{ padding: 6, backgroundColor: '#ffffff09' }}>
+    <text style={{ fontSize: 12, color: '#a3a3a3' }}>{language}</text>
+  </div>
+  <code code={source} language={language} style={{ padding: 12, minWidth: 0 }} />
+</div>
+```
+
+`<markdown>` 不同：它保留自己那张围栏代码块卡片，因为文档渲染器掌握着自身的布局。可以用 `mdCode*` 这组度量值来微调那张卡片。
+
+## `<diff>`
+
+一个统一格式（unified）的 diff 查看器。默认情况下它**随父元素流动**，因此父级列表可以是唯一的滚动器。折叠一个文件会移除它的行（而非隐藏它们），因此一个被折叠的一万行文件只占一行。
+
+用 `maxLines` 来让长补丁保持短小。「显示更多」会触发 `onShowMore`。在那个处理器里清空 `maxLines` 即可显示其余部分。
+
+只有当你需要一个专门的全窗口查看器时，才传入 `scroll` 与一个**有界高度**。那条路径使用 GPUI 的 `list()` 并做虚拟化。不要把它嵌套进另一个滚动器中。参见[滚动](/docs/scrolling)。
+
+```tsx
+<diff
+  patch={unifiedPatch}
+  wordDiff                     // 仅高亮发生了变化的 token
+  maxLines={open ? undefined : 24}
+  collapsedPaths={['pnpm-lock.yaml']}
+  onShowMore={() => setOpen(true)}
+  onToggleFile={(e) => toggle(e.value)}
+  onLineClick={(e) => console.log(e.oldLine, e.newLine, e.value)}
+/>
+```
+
+## `<markdown>`
+
+GitHub 风格 markdown：标题、列表、表格、块引用、围栏代码、删除线、任务列表，以及自动链接的裸 URL。
+
+```tsx
+<markdown source={readme} onLinkClick={(e) => open(e.value)} />
+```
+
+## 主题
+
+这三个组件都接受同一个可选的 `theme` 属性。每一个字段都会叠加在内置的暗色主题之上，因此只覆盖其中一个 token，其余的仍保持原样。
+
+```tsx
+<code
+  code={source}
+  language="rust"
+  theme={{
+    appearance: 'dark',        // 或 'light'
+    accent: '#7c86ff',
+    syntax: { keyword: '#f38ba8', string: '#a6e3a1' },
+  }}
+/>
+```
+
+## 布局数字也住在主题里
+
+行高、行号槽宽度、内边距以及标题字号阶梯都位于 `metrics` 下，是属性而非 Rust 常量，因此调校设计只是一次 React 重新渲染，而绝不需要重新构建原生层。
+
+```tsx
+<diff
+  patch={patch}
+  theme={{
+    metrics: {
+      diffLineHeight: 26,
+      diffGutterWidth: 48,
+      mdHeadingSizes: [24, 19, 16, 14],
+    },
+  }}
+/>
+```
+
+当 `scroll` 开启时，`<diff>` 会从这些数字出发做虚拟化，而无需测量，因此改动 `diffLineHeight` 也会重新调整滚动模型的大小。
+
+<Callout type="tip">
+  **同样这三件事可以完全免去重新构建：** 修改 `patch` 或 `source`，下一帧就会显示。调整 `theme.metrics` 里的行高或标题字号只是一次 React 重渲染。
+</Callout>
+
+## 内置语言
+
+Rust、TypeScript、TSX、JavaScript、JSX、Python、Go、JSON、Bash、TOML、YAML、Markdown、HTML、CSS、C。

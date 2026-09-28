@@ -1,0 +1,551 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+   设计令牌
+
+   一条规则：中性色永远是冷 zinc，全站只有一个强调色（ember 余烬橙）。
+   语义色（green / amber / rose）只出现在 Callout 与代码复制反馈里，
+   不参与品牌表达。
+
+   字体：不加载拉丁 webfont。正文以中文为主，任何拉丁字体都会在
+   「拉丁字形 = webfont / 汉字字形 = 系统字体」之间产生风格断裂，
+   而 CJK webfont 是数 MB 级别的代价。身份由 mono 与字号字重承担。
+   ========================================================================== */
+
+@theme {
+  /* 浅色：off-white 起步，不用纯白 */
+  --color-canvas: #fafafa;
+  --color-canvas-subtle: #f4f4f5;
+  --color-surface: #ececef;
+  --color-surface-2: #e2e2e6;
+  --color-overlay: #fdfdfd;
+  --color-code-bg: #f4f4f5;
+
+  --color-line: #e2e2e6;
+  --color-line-strong: #c7c7ce;
+
+  /* 灰阶全部按 WCAG AA 定档：faint 也在 4.5:1 以上 */
+  --color-ink: #16171a;
+  --color-ink-soft: #33353b;
+  --color-ink-muted: #5b5e66;
+  --color-ink-faint: #6e717a;
+
+  --color-accent: #b8400f;
+  --color-accent-hover: #94330b;
+  --color-accent-soft: #f6e7de;
+  --color-accent-ink: #fdfdfd;
+  --color-on-accent-soft: #8c3009;
+
+  --color-green: #17693c;
+  --color-green-soft: #e2f1e8;
+  --color-on-green-soft: #14532f;
+
+  --color-amber: #8a5206;
+  --color-amber-soft: #f7ecd9;
+  --color-on-amber-soft: #6f4206;
+
+  --color-rose: #a5243c;
+  --color-rose-soft: #f8e3e7;
+  --color-on-rose-soft: #83172c;
+
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
+  --font-mono:
+    ui-monospace, 'SFMono-Regular', 'Cascadia Mono', 'JetBrains Mono', Menlo, Consolas,
+    'Noto Sans Mono', monospace;
+
+  /* 一个圆角档位，全站共用 */
+  --radius-card: 0.375rem;
+
+  --shadow-card: 0 1px 2px rgb(22 23 26 / 0.05), 0 1px 1px rgb(22 23 26 / 0.04);
+  --shadow-pop: 0 18px 40px -18px rgb(22 23 26 / 0.28), 0 2px 8px -2px rgb(22 23 26 / 0.12);
+
+  --text-hero: clamp(2.05rem, 1.15rem + 3.1vw, 3.35rem);
+  --text-title: clamp(1.45rem, 1.05rem + 1.3vw, 2rem);
+}
+
+.dark {
+  /* 深色：off-black，不用纯黑 */
+  --color-canvas: #0b0c0e;
+  --color-canvas-subtle: #0f1114;
+  --color-surface: #16181c;
+  --color-surface-2: #1e2126;
+  --color-overlay: #14161a;
+  --color-code-bg: #0f1114;
+
+  --color-line: #25282e;
+  --color-line-strong: #3a3e46;
+
+  --color-ink: #ececee;
+  --color-ink-soft: #b9bcc2;
+  --color-ink-muted: #8b8f97;
+  --color-ink-faint: #757a83;
+
+  --color-accent: #f58a4b;
+  --color-accent-hover: #ffa26b;
+  --color-accent-soft: #2a1a12;
+  --color-accent-ink: #0b0c0e;
+  --color-on-accent-soft: #f5a97a;
+
+  --color-green: #56b57f;
+  --color-green-soft: #10231a;
+  --color-on-green-soft: #7fc9a0;
+
+  --color-amber: #d9a55e;
+  --color-amber-soft: #251a0d;
+  --color-on-amber-soft: #e3bd85;
+
+  --color-rose: #e2758c;
+  --color-rose-soft: #2a1118;
+  --color-on-rose-soft: #eb9aab;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-pop: 0 20px 44px -18px rgb(0 0 0 / 0.75), 0 2px 10px -2px rgb(0 0 0 / 0.5);
+}
+
+/* ==========================================================================
+   基础层
+   ========================================================================== */
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5.5rem;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-accent) 26%, transparent);
+  }
+
+  :is(h2, h3, h4) {
+    scroll-margin-top: 6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  /* 所有装饰性动效一律静止：入场位移、进度条动画都归位到最终状态 */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ==========================================================================
+   滚动条
+   ========================================================================== */
+
+@supports (scrollbar-width: thin) {
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+}
+
+.scroll-slim::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.scroll-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-slim::-webkit-scrollbar-thumb {
+  background-color: var(--color-line-strong);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.scroll-slim::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-ink-faint);
+  background-clip: content-box;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ==========================================================================
+   排版 —— 文档正文
+   ========================================================================== */
+
+@layer components {
+  .prose-doc {
+    color: var(--color-ink-soft);
+    font-size: 0.9375rem;
+    line-height: 1.78;
+  }
+
+  .prose-doc > * + * {
+    margin-top: 1.2em;
+  }
+
+  /* 标题左侧一道 ember 竖线，取代「每条 h2 下方画一根通栏 hairline」的默认做法 */
+  .prose-doc h2 {
+    position: relative;
+    color: var(--color-ink);
+    font-size: 1.3125rem;
+    line-height: 1.4;
+    font-weight: 680;
+    letter-spacing: -0.014em;
+    margin-top: 2.9em;
+    margin-bottom: 0.2em;
+    padding-left: 0.75em;
+    scroll-margin-top: 6rem;
+  }
+
+  .prose-doc h2::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.32em;
+    width: 2px;
+    height: 1.15em;
+    background-color: var(--color-accent);
+  }
+
+  .prose-doc h3 {
+    color: var(--color-ink);
+    font-size: 1.0625rem;
+    line-height: 1.5;
+    font-weight: 660;
+    letter-spacing: -0.008em;
+    margin-top: 2.2em;
+    margin-bottom: 0.1em;
+    scroll-margin-top: 6rem;
+  }
+
+  .prose-doc h4 {
+    color: var(--color-ink);
+    font-size: 0.9375rem;
+    font-weight: 660;
+    margin-top: 1.8em;
+    margin-bottom: 0.1em;
+    scroll-margin-top: 6rem;
+  }
+
+  .prose-doc h2 + *,
+  .prose-doc h3 + *,
+  .prose-doc h4 + * {
+    margin-top: 0.85em;
+  }
+
+  .prose-doc a {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+    text-decoration-color: color-mix(in oklab, var(--color-accent) 38%, transparent);
+    transition: text-decoration-color 0.15s ease;
+  }
+
+  .prose-doc a:hover {
+    text-decoration-color: var(--color-accent);
+  }
+
+  .prose-doc strong {
+    color: var(--color-ink);
+    font-weight: 660;
+  }
+
+  .prose-doc :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 0.855em;
+    padding: 0.15em 0.38em;
+    border-radius: 4px;
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+    white-space: nowrap;
+  }
+
+  .prose-doc ul,
+  .prose-doc ol {
+    padding-left: 1.35em;
+  }
+
+  .prose-doc ul {
+    list-style: disc;
+  }
+  .prose-doc ol {
+    list-style: decimal;
+  }
+
+  .prose-doc li::marker {
+    color: var(--color-ink-faint);
+  }
+
+  .prose-doc li + li {
+    margin-top: 0.4em;
+  }
+
+  .prose-doc li > ul,
+  .prose-doc li > ol {
+    margin-top: 0.4em;
+  }
+
+  .prose-doc blockquote {
+    border-left: 2px solid var(--color-accent);
+    padding-left: 1em;
+    color: var(--color-ink-muted);
+  }
+
+  .prose-doc hr {
+    border: 0;
+    border-top: 1px solid var(--color-line);
+    margin-block: 2.5em;
+  }
+
+  .prose-doc img {
+    border-radius: var(--radius-card);
+    border: 1px solid var(--color-line);
+  }
+
+  /* 正文表格：只在表头下方与分组处落线，不给每行都加 hairline */
+  .prose-doc table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    display: block;
+    overflow-x: auto;
+  }
+
+  .prose-doc thead {
+    border-bottom: 1px solid var(--color-line-strong);
+  }
+
+  .prose-doc th {
+    text-align: left;
+    font-weight: 660;
+    color: var(--color-ink);
+    padding: 0.55em 0.9em 0.55em 0;
+    white-space: nowrap;
+  }
+
+  .prose-doc td {
+    padding: 0.55em 0.9em 0.55em 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-line) 60%, transparent);
+    vertical-align: top;
+  }
+
+  .prose-doc tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .prose-doc td:first-child {
+    color: var(--color-ink);
+  }
+}
+
+/* ==========================================================================
+   Shiki 双主题代码块
+   ========================================================================== */
+
+.shiki {
+  /* 代码块底色跟站内 surface 走，不用主题自带的纯白 / 纯黑 */
+  background-color: var(--color-code-bg) !important;
+  color: var(--shiki-light) !important;
+}
+
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--color-code-bg) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+  text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+
+.code-frame {
+  position: relative;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background-color: var(--color-canvas-subtle);
+}
+
+.prose-doc .code-frame pre,
+.prose-doc figure.astro-code {
+  margin: 0;
+}
+
+.prose-doc pre {
+  overflow-x: auto;
+  padding: 0.9rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  tab-size: 2;
+}
+
+.prose-doc pre code {
+  font-family: var(--font-mono);
+  display: block;
+  min-width: fit-content;
+}
+
+.code-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.3rem 0.4rem 0.3rem 0.8rem;
+  border-bottom: 1px solid var(--color-line);
+  background-color: var(--color-surface);
+  min-height: 2.05rem;
+}
+
+.code-lang {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+  color: var(--color-ink-muted);
+}
+
+.code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-family: var(--font-sans);
+  color: var(--color-ink-muted);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.code-copy svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.code-copy:hover {
+  background-color: var(--color-surface-2);
+  color: var(--color-ink);
+}
+
+.code-copy.is-done {
+  color: var(--color-green);
+}
+.code-copy.is-failed {
+  color: var(--color-rose);
+}
+
+/* ==========================================================================
+   工具类
+   ========================================================================== */
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility text-pretty {
+  text-wrap: pretty;
+}
+
+/* 等宽小标签：用于真实的元信息（键名、平台、数值），不是装饰性 eyebrow */
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  color: var(--color-ink-muted);
+}
+
+/* 阅读进度：纯 CSS 滚动驱动，不挂 scroll 监听。
+   必须用长属性，animation 简写会把 animation-timeline 重置回 auto。 */
+@utility read-progress {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  z-index: 70;
+  pointer-events: none;
+  transform-origin: 0 50%;
+  background-color: var(--color-accent);
+  animation-name: read-progress-scale;
+  animation-fill-mode: both;
+  animation-timing-function: linear;
+  animation-timeline: scroll(root block);
+}
+
+@keyframes read-progress-scale {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* 不支持滚动驱动动画的浏览器直接不显示，不留一条假进度条 */
+@supports not (animation-timeline: scroll()) {
+  .read-progress {
+    display: none;
+  }
+}
+
+/* 落地页首屏入场：只在允许动效时运行 */
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation-name: rise-in;
+    animation-duration: 0.62s;
+    animation-fill-mode: both;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .rise-1 {
+    animation-delay: 0.04s;
+  }
+  .rise-2 {
+    animation-delay: 0.12s;
+  }
+  .rise-3 {
+    animation-delay: 0.2s;
+  }
+  .rise-4 {
+    animation-delay: 0.28s;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

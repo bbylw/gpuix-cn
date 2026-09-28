@@ -1,0 +1,98 @@
+---
+title: 实现状态
+description: GPUIX 各项能力的完成情况：已完成、待办与已知限制。
+eyebrow: 参考
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+import Feature from '../../components/mdx/Feature.astro'
+
+## 核心运行时
+
+<ul>
+  <Feature done>基于 mutation 协议的 React reconciler</Feature>
+  <Feature done>通过 napi-rs 与 wasm-bindgen 实现的原子化 `applyBatch()` 变更传输</Feature>
+  <Feature done>RetainedTree（Rust 侧元素存储）</Feature>
+  <Feature done>样式映射（CSS 属性 → GPUI 样式方法）</Feature>
+</ul>
+
+## 事件与输入
+
+<ul>
+  <Feature done>鼠标事件（click、mouseDown、mouseUp、mouseMove、mouseEnter、mouseLeave）</Feature>
+  <Feature done>外侧点击（`onMouseDownOutside`）</Feature>
+  <Feature done>带 delta 与触摸相位的滚轮事件</Feature>
+  <Feature done>键盘事件（keyDown、keyUp），带焦点管理</Feature>
+  <Feature done>获得/失去焦点事件，自动创建 FocusHandle</Feature>
+  <Feature done>原生文本输入与多行 textarea</Feature>
+</ul>
+
+## 布局与绘制
+
+<ul>
+  <Feature done>可滚动容器（`overflow: "scroll"`），带持久滚动状态</Feature>
+  <Feature done>编程式滚动 API（`scrollTo`、`scrollToItem`、`scrollIntoView`、`getScrollOffset`）</Feature>
+  <Feature done>虚拟列表（`<virtual-list>`）</Feature>
+  <Feature done>原生文本组件（`<code>`、`<diff>`、`<markdown>`）</Feature>
+  <Feature done>图像与 SVG 元素（`<img>`、`<svg>`），以及 `<img>` ref 上的 `setImage` / `setImagePixels`</Feature>
+  <Feature done>原生 `hover` 与 `active` 样式</Feature>
+  <Feature done>原生 `motion.div` 过渡，带确定性帧捕获</Feature>
+  <Feature done>`motion.div` 的 `AnimatePresence` 退场过渡</Feature>
+  <Feature>Canvas 元素</Feature>
+</ul>
+
+## 文本能力
+
+<ul>
+  <Feature done>跨元素文本选区</Feature>
+  <Feature done>文本高亮与搜索（`highlight`、`useTextSearch`）</Feature>
+  <Feature done>无样式 Select、Combobox 与 Tooltip</Feature>
+</ul>
+
+## 窗口
+
+<ul>
+  <Feature done>窗口标题（`setWindowTitle`）</Feature>
+  <Feature done>原生窗口控制（`minimizeWindow`、`zoomWindow`、`toggleFullscreen`）</Feature>
+  <Feature done>窗口装饰（`titlebarTransparent`、`windowBackground`、红绿灯位置）</Feature>
+  <Feature done>带标准快捷键的 macOS 菜单栏（`appName`）</Feature>
+  <Feature done>后台启动（`focus`、`show`、`activateWindow`）</Feature>
+  <Feature done>最后一个窗口关闭时退出进程</Feature>
+  <Feature done>运行时错误保持 macOS 窗口存活并显示堆栈浮层</Feature>
+  <Feature done>调试边框浮层（`debugFrameOverlay` / `setDebugFrameOverlay`）</Feature>
+  <Feature>应用声明的菜单与菜单回调</Feature>
+  <Feature>多窗口</Feature>
+</ul>
+
+## 开发体验
+
+<ul>
+  <Feature done>带截图的 GPU 支撑测试渲染器</Feature>
+  <Feature done>独立构建（锁定 GPUI 平台依赖）</Feature>
+  <Feature done>`bun --hot` 下的 JS 重挂载（`render()` 保留原生窗口）</Feature>
+  <Feature>原生 `.node` 插件的热重载。`bun run dev` 会重新编译并重启。原生模块无法卸载。</Feature>
+  <Feature>`bun --hot` 期间的 React Refresh（需要 Bun 运行时转换）</Feature>
+</ul>
+
+## 已知限制
+
+| 限制 | 说明 |
+|---|---|
+| 没有嵌套滚动 | 只允许一个父元素滚动，见[滚动](/docs/scrolling) |
+| Linux 忽略 `focus` | 窗口仍会以聚焦状态打开，见[后台启动](/docs/background) |
+| 浏览器渲染器无窗口控制 | `minimizeWindow` 等在浏览器中不可用 |
+| 浏览器渲染器无 AccessKit | 无障碍 props 在 wasm 构建中是空操作，见[无障碍](/docs/accessibility) |
+| Linux 测试渲染器 | 暂不支持，等待 GPUI 的 wgpu 无头渲染器，见[测试](/docs/testing) |
+| 颜色文法是 `csscolorparser` 0.8.3 | `hsv()` / `hsva()` / `hwba()` 是解析器扩展而非 CSS Color 4 标准函数；不支持径向、锥形与重复渐变，也不支持超过两个色标的渐变，见[支持的样式](/docs/styling#颜色) |
+
+<Callout type="note">
+  GPUIX 仍处于 1.0 之前的阶段。破坏性变更可能在 v1 之前出现。请把所选的 adapter 与 `@gpuix/native` 固定到**完全相同的版本**，并一起升级它们。详见[从零开始构建](/docs/from-scratch)。
+</Callout>
+
+## 文档
+
+详细的架构、通信流程与贡献指南见 [AGENTS.md](https://github.com/remorses/gpuix/blob/main/AGENTS.md)。
+
+## 许可证
+
+[Apache-2.0](https://github.com/remorses/gpuix/blob/main/LICENSE)

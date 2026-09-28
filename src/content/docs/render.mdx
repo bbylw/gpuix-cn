@@ -1,0 +1,99 @@
+---
+title: render() 与窗口选项
+description: render() 创建原生窗口、挂载 React 并启动帧循环，以及它接受的窗口装饰与行为选项。
+eyebrow: 窗口与渲染器
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+```tsx
+import React, { useState } from 'react'
+import { render } from '@gpuix/react'
+
+function App() {
+  const [count, setCount] = useState(0)
+  return (
+    <div style={{ display: 'flex', gap: 8, padding: 16 }}>
+      <div
+        style={{ backgroundColor: '#3b82f6', borderRadius: 8, padding: 12, cursor: 'pointer' }}
+        onClick={() => setCount(c => c + 1)}
+      >
+        <div style={{ color: '#ffffff' }}>Count: {count}</div>
+      </div>
+    </div>
+  )
+}
+
+render(<App />, {
+  title: 'My App',
+  width: 800,
+  height: 600,
+  titlebarTransparent: true,
+  windowBackground: 'blurred',
+  trafficLightX: 16,
+  trafficLightY: 17,
+})
+```
+
+`render()` 会创建原生窗口、挂载 React 并启动帧循环。红色的红绿灯按钮会退出进程。需要从终端再次启动应用。
+
+| 选项 | 取值 | 用途 |
+|---|---|---|
+| `titlebarTransparent` | boolean | 隐藏原生标题栏，让应用把装饰元素绘制在红绿灯按钮之下 |
+| `windowBackground` | `"opaque"`（默认）、`"transparent"`、`"blurred"` | 窗口填充。`"blurred"` 即 macOS 的 vibrancy 背景 |
+| `trafficLightX` / `trafficLightY` | 像素 | 红绿灯按钮原点。chat 示例使用的是 `(16, 17)` |
+| `transparent` | boolean | 当 `windowBackground` 未设置时，等同于 `windowBackground: "transparent"` |
+| `appName` | string | macOS `Hide X` 与 `Quit X` 条目里的名称。默认为 `title` |
+| `focus` | boolean，默认 `true` | 设为 `false` 时窗口在活跃应用之后打开，类似 `open -g` |
+| `show` | boolean，默认 `true` | 设为 `false` 时窗口以隐藏方式打开。调用 `activateWindow()` 来显示它 |
+
+在保存后再次调用它，它会在同一个窗口上重新挂载组件树。
+
+## 其它 render 选项
+
+| 选项 | 用途 |
+|---|---|
+| `onKeyDown` / `onKeyUp` | 窗口级键盘监听器，见[焦点与键盘导航](/docs/focus-keyboard#渲染器键盘回调) |
+| `onSelectionChange` | 窗口级选区变更回调，见[文本选区](/docs/text-selection) |
+| `debugFrameOverlay` | 帧时间叠加层，见[调试帧叠加层](/docs/debug-overlay) |
+| `keyboardFocusDim` | 关闭「其余元素变暗」的默认焦点行为 |
+| `tabNavigation` | `false` 关闭 Tab 的默认焦点移动 |
+
+## macOS 菜单栏
+
+GPUIX 会为你安装好应用菜单栏，因此一个全新的应用就已经响应 `⌘Q`、`⌘H`、`⌥⌘H`、`⌘M` 与 `⌘W`。若没有它，`NSApp.mainMenu` 会是 nil，macOS 绘制出的菜单栏是空的，而这些快捷键根本不存在：AppKit 只通过菜单项来提供它们。
+
+```text
+Apple    <executable>             Window
+         ├ Services               ├ (AppKit window tiling)
+         ├ Hide <appName>   ⌘H    ├ Minimize          ⌘M
+         ├ Hide Others     ⌥⌘H    ├ Zoom
+         ├ Show All               ├ Close Window      ⌘W
+         └ Quit <appName>   ⌘Q    └ (open windows)
+```
+
+<Callout type="note">
+  **`appName` 并不会设置应用菜单的标题。** macOS 从可执行文件获取该标题，因此开发期间 `bun app.tsx` 显示的是 `bun`，而 `bun build --compile` 编译出的二进制显示的是它自己的文件名。只有真正的 `.app` bundle 才会改变它。`appName` 只会影响菜单内部的条目，仅此而已。
+</Callout>
+
+**没有 Edit 菜单**，这是有意为之。菜单的按键等效（key equivalent）会被 AppKit 在窗口接收到按键事件之前就消费掉，因此一个带有 `⌘C` 的 Edit 菜单会把按键从文本选区以及 `<input>` 手中抢走。
+
+## 用 render()，而不是 createRenderer()
+
+在应用入口处请使用 **`render()`**，而非 `createRenderer()`。`bun --hot` 在保存时会重新运行整个文件。若用 `createRenderer()` 加 `init()`，就会再构建一个宿主。`render()` 是幂等的：第一次调用拥有窗口，后续调用只会重新挂载 React。
+
+`createRenderer()`、`createRoot()` 与 `startFrameLoop()` 仍然公开，供测试和自定义宿主使用。当你已经持有一个 renderer 时，可以把 `{ renderer }` 传入 `render()`。
+
+**一个 renderer 驱动一个 root。** 一个 renderer 拥有一个窗口、一个原生 root id 和一张事件映射表，因此若该 renderer 已经有了一个已挂载的 root，`createRoot()` 会抛出异常。在创建另一个 root 之前，请先对第一个 root 调用 `unmount()`；`render()` 已经替你做了这件事。
+
+## 帧循环
+
+在 **macOS** 上，`startFrameLoop` 会以固定频率（默认约 125fps）调用 `renderer.tick()`。每一帧只排空已就绪的 AppKit 事件与 Core Foundation 源，随后便返回，不会等待下一次原生唤醒。Bun 的定时器、socket、promise 以及 PTY 回调都可以在帧之间运行。传入 `{ frameMs }` 可改变频率，并对返回的控制句柄调用 `.stop()` 来结束它。
+
+在 **Windows 与 Linux** 上，GPUI 在一个专用的 Rust UI 线程上运行其正常的阻塞式原生事件循环。`tick()` 并不会驱动该循环。它只报告 UI 线程是否仍处于 `Platform::run` 内部。`startFrameLoop` 仍然会创建一个 JavaScript 定时器，以便「最后一个窗口关闭」能够返回 false、而 `render()` 能够 `process.exit`，从而与 macOS 保持一致。所有平台都使用 GPUI 原生的平台、窗口、渲染器、输入、滚动、剪贴板、键盘与 IME 实现。内嵌的 macOS 运行循环扩展来自被固定的 GPUIX fork。
+
+<Callout type="important">
+  在 macOS 上，**绝不要**用 `setImmediate` 循环来驱动 `tick()`。那会以每秒数万次的频率空转，在完全空闲的应用上烧掉 **73% 的 CPU**，而按节奏驱动时只有 **1%**。
+</Callout>
+
+**运行时抛错不会冻结窗口。** 帧循环会捕获来自 `tick()` 的错误，原生事件回调会捕获来自 React 处理器的抛错，而 `render()` 会安装 `uncaughtException` / `unhandledRejection` 监听器，从而让 bun 保持存活。窗口会显示堆栈，以及一个**重新加载**按钮，用于重新挂载上一次的 `render()` 树。在 `bun --hot` 下保存也会重新挂载。进程不会退出。

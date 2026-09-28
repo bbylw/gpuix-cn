@@ -1,0 +1,50 @@
+---
+title: 调试帧叠加层
+description: '叠加层显示的是绘制时间而非 FPS。三个模式、四项统计，以及性能回归测试怎么跑。'
+eyebrow: 窗口与渲染器
+---
+
+GPUI 会在布局之后把帧时间统计绘制进窗口。这个叠加层并不是一个 React 元素 —— 一个 React 的 FPS 标签会每帧都更新，反而造成更多工作。
+
+```tsx
+render(<App />, { title: 'My App', debugFrameOverlay: 'full' })
+```
+
+| 模式 | 你看到的内容 |
+|---|---|
+| `hidden` | 无（默认） |
+| `minimal` | 上次绘制时间，例如 `8.3 MS` |
+| `full` | `CUR`、`1%`、`10%`、`MAX`、`FRAMES` |
+
+或者直接调用 renderer：
+
+```ts
+renderer.setDebugFrameOverlay('full')
+renderer.cycleDebugFrameOverlay()
+renderer.resetDebugFrameOverlayStats()
+renderer.getDebugFrameOverlay() // 'hidden' | 'minimal' | 'full'
+renderer.getDebugFrameOverlayStats()
+// { currentMs, p90Ms, p99Ms, maxMs, frames, samples }
+```
+
+`p90Ms` 是叠加层的 **10%** 那条线。`p99Ms` 是 **1%** 那条线。它们代表的是缓慢的尾部。
+
+<Callout type="tip" title="8.3 MS 约等于 120 Hz">
+  叠加层显示的是**绘制时间**，而非 FPS。
+</Callout>
+
+## 性能回归测试
+
+chat 示例为此提供了一个回归测试：`examples/chat.perf.test.tsx`。它对挂载、滚轮绘制与侧边栏点击计时。它断言的是 p95，而非每一帧。
+
+默认的示例套件排除了这个硬件计时测试，以免共享 CI runner 的方差导致功能检查失败。请在目标 Mac 上显式运行它。
+
+在 macOS 上，`THROTTLE=utility` 会在 `taskpolicy -c utility` 之下重启进程。这会把工作钉在 E-core 上。它是对 **M1/M2 Air CPU** 的近似，而非 Chrome 的 6 倍。GPU 与 RAM 仍然很快。`THROTTLE=background` 更慢。
+
+```bash
+cd examples
+THROTTLE=utility bun run test:perf
+THROTTLE=utility bun --hot chat.tsx
+```
+
+与虚拟列表的裁剪策略配合使用效果最好，参见[虚拟列表](/docs/virtual-list#可平移表面必须裁剪)。

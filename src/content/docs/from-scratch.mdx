@@ -1,0 +1,98 @@
+---
+title: 从零开始构建
+description: 不使用官方示例，直接安装 @gpuix/react 与 @gpuix/native，并配置 TypeScript 的 JSX 类型。
+eyebrow: 新手指南
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+如果你不想要示例应用，可以直接安装这些包：
+
+```bash
+bun add --exact @gpuix/react @gpuix/native react
+bun add -d @types/react typescript
+```
+
+<Callout type="warning" title="把两个包钉到同一版本">
+  **请将你的 adapter 与 `@gpuix/native` 固定到完全相同的版本。** GPUIX 仍处于 1.0 之前的版本，因此一次新发布都可能破坏其中任意一个包。adapter 会以版本区间的方式拉取 `@gpuix/native`，而这个区间可能在较旧的 adapter 下安装一个更新的原生二进制。请把两者都作为直接依赖添加，并一起升级。
+</Callout>
+
+## 1. 让 TypeScript 指向 GPUIX 的 JSX 类型
+
+**`jsxImportSource` 是必需的。** 若缺少它，TypeScript 会使用 DOM 类型，导致 `<virtual-list>`、`<markdown>`、`<code>` 与 `style.hover` 都无法通过类型检查。
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "@gpuix/react",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  }
+}
+```
+
+## 2. 编写入口文件
+
+文件以 `render()` 结尾。该调用会创建窗口、挂载 React 并启动帧循环。
+
+```tsx
+import { useState } from 'react'
+import { render } from '@gpuix/react'
+
+function App() {
+  const [count, setCount] = useState(0)
+  return (
+    <div style={{ padding: 24, backgroundColor: '#1a1a1a', height: '100%' }}>
+      <div
+        onClick={() => setCount((c) => c + 1)}
+        style={{
+          padding: 12,
+          borderRadius: 8,
+          cursor: 'pointer',
+          backgroundColor: '#232323',
+          hover: { backgroundColor: '#2c2c2c' },
+        }}
+      >
+        <text style={{ color: '#e2e2e2' }}>Count: {count}</text>
+      </div>
+    </div>
+  )
+}
+
+render(<App />, { title: 'My App', width: 800, height: 600 })
+```
+
+<Callout type="important">
+  **给每一处 `<text>` 都设置 `color`。** GPUI 不会从父元素继承 `color`，因此没有颜色的文本会被绘制成**黑色**，在深色表面上会消失不见。
+</Callout>
+
+## 3. 运行它
+
+```bash
+bun --hot app.tsx
+```
+
+使用 `bun --hot`，而不是普通的 `bun`。这样保存时会在同一个窗口上重新挂载 React，而非打开第二个窗口。
+
+## 4. 编译为二进制
+
+```bash
+bun build --compile app.tsx --outfile dist/app
+./dist/app
+```
+
+该二进制自带渲染器，因此运行时无需 Bun，也无需安装 Node。若想让发布体积更小，可以不在 Bun 上运行这个 React 应用，而是改用 [hermes-node](https://github.com/remorses/gpuix/blob/main/website/src/guides/hermes.mdx)：那条路径是 **12 MB** 外加一个 **22 MB** 的原生 sidecar。完整的打包步骤见 [编译为二进制文件](/docs/bundle-binary) 与 [打包成带图标的 App](/docs/packaging)。
+
+## 5. Shell 补全
+
+为 `gpuix` 命令安装补全：
+
+```bash
+bun add -g @gpuix/cli
+gpuix completions install
+```

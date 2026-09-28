@@ -1,0 +1,120 @@
+---
+title: 滚动
+description: 'overflow: scroll 容器获得原生滚动物理。哪些约束最容易踩坑，以及如何让多个窗格逐像素同步。'
+eyebrow: 组件
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+带有 `overflow: "scroll"` 的容器会变成原生可滚动的。GPUI 会自动处理滚动物理、裁剪与偏移保持。
+
+普通的滚动容器仍然会构建每一个子元素。当集合可能变得很大时，请使用 [`<virtual-list>`](/docs/virtual-list)。
+
+<Callout type="important" title="不支持嵌套滚动">
+  只允许一个父元素滚动。内部的 `overflow: "scroll"`、`<virtual-list>` 或 `<diff>` 都不能滚动。GPUI 会把同一个滚轮事件同时发给这两个命中框，于是内部列表会抢走这个手势。
+
+  把长内部内容留在那个父元素里。用**可展开**（预览加「显示更多」）把它折叠起来，而不要给子元素自己的视口。
+</Callout>
+
+<Callout type="tip" title="水平溢出是例外">
+  在宽子元素（一行代码、一张表格）上设置 `overflowX: "scroll"` 不会抢走垂直滚轮。GPUIX 把它布局为一个带有 `minWidth: 0` 的 flex 视口。宽子元素不能被压缩：设置 `flexShrink: 0` 或一个确定的宽度。在 **X** 方向上滑动来平移。垂直滚轮仍留在父元素上。
+</Callout>
+
+```tsx
+function Expandable({
+  preview,
+  children,
+}: {
+  preview: React.ReactNode
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {open ? children : preview}
+      {!open && <div onClick={() => setOpen(true)}>Show more</div>}
+    </div>
+  )
+}
+```
+
+## 基本滚动容器
+
+```tsx
+function ScrollableList() {
+  return (
+    <div style={{ height: 300, overflow: 'scroll' }}>
+      {items.map((item, i) => (
+        <div key={i} style={{ height: 60, padding: 12 }}>
+          {item.name}
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+按轴滚动：使用 `overflowX: "scroll"` 或 `overflowY: "scroll"`。`overflow: "scroll"` 会像浏览器一样，从一个对角线的手势同时滚动两个轴。
+
+flex 列会把它的子元素拉伸到交叉轴，因此一个双轴容器需要它的每一行声明一个宽度。否则在 **X** 方向上就没有任何可平移的内容：
+
+```tsx
+<div style={{ width: 260, height: 220, overflow: 'scroll', display: 'flex', flexDirection: 'column' }}>
+  {rows.map((row) => (
+    <div key={row.id} style={{ display: 'flex', width: 810, flexShrink: 0 }}>
+      {row.cells}
+    </div>
+  ))}
+</div>
+```
+
+## 必须一起移动的面板
+
+原生滚动容器无法驱动**冻结表头**。GPUI 在滚轮那一帧移动容器，而要移动表头的 JavaScript 回调会晚一帧才到达，因此快速平移时表头会被撕裂开。
+
+当两个窗格必须逐像素锁定时，在 React 中拥有这个偏移量：在一个**不滚动**的父元素上放一个 `onScroll` 监听器，把 `scrollX` 和 `scrollY` 保留在 state 中，并用绝对定位的包装层平移每个窗格的内容。Zed 也是这么做的：编辑器拥有自己的滚动位置，并据此绘制标尺和文本。
+
+```tsx
+function Pane({ offsetX, children }: { offsetX: number; children: React.ReactNode }) {
+  return (
+    <div style={{ flexGrow: 1, minWidth: 0, overflow: 'hidden', position: 'relative' }}>
+      {/* An empty positioned box still takes hits, so opt it out. */}
+      <div style={{ position: 'absolute', left: -offsetX, top: 0, pointerEvents: 'none' }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+```
+
+把正在移动的子树放在一个 `memo` 组件中，其 props 在平移过程中保持不变。这样滚轮只会带来少量的样式 mutation，而不是每行一个。[timeline 示例](https://github.com/remorses/gpuix/blob/main/examples/timeline.tsx) 就对一个标尺、一条轨道列以及一个片段网格做了这样的处理。
+
+## 编程式滚动
+
+请使用宿主 ref。`scrollIntoView()` 会向上找到最近的滚动父元素。在你已经持有一个 id 时，`scrollTo` 和 `scrollToItem` 仍然存在于 renderer 上。
+
+```tsx
+function ProgrammaticScroll() {
+  const lastItem = useRef<PublicInstance>(null)
+
+  return (
+    <>
+      <div style={{ height: 200, overflow: 'scroll' }}>
+        {items.map((item, i) => (
+          <div key={i} ref={i === items.length - 1 ? lastItem : undefined}>
+            {item}
+          </div>
+        ))}
+      </div>
+      <div onClick={() => lastItem.current?.scrollIntoView?.()}>Jump to last</div>
+    </>
+  )
+}
+```
+
+```ts
+renderer.scrollTo(elementId, x, y)        // 直接设置偏移
+renderer.scrollToItem(elementId, index)   // 将子元素滚动到可见区域
+renderer.scrollIntoView(elementId)        // 最近的滚动父元素
+renderer.getScrollOffset(elementId)       // 返回 [x, y] 或 null
+```

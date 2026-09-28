@@ -1,0 +1,99 @@
+---
+title: 打包成带图标的 App
+description: 原始的 Mach-O 文件没有 Dock 图标。用 cargo-packager 包装该二进制文件，得到 .app、.AppImage 或 setup .exe。
+eyebrow: 打包与发布
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+原始的 Mach-O 文件没有 Dock 图标。请用 [cargo-packager](https://github.com/crabnebula-dev/cargo-packager) 来包装该二进制文件。配置：[Config](https://docs.rs/cargo-packager/latest/cargo_packager/config/struct.Config.html)。CLI：[docs.rs/cargo-packager](https://docs.rs/cargo-packager/latest/cargo_packager/)。
+
+```bash
+cargo install cargo-packager --locked
+```
+
+## 生成 .icns
+
+用一张 1024 的 PNG 生成 `.icns`，然后再打包。传入的是 `.icns`，而不是 1024 的 PNG —— cargo-packager 曾以 `No matching IconType` 拒绝过 1024 的 PNG。
+
+```bash
+mkdir AppIcon.iconset
+sips -z 16 16 icon-1024.png --out AppIcon.iconset/icon_16x16.png
+sips -z 32 32 icon-1024.png --out AppIcon.iconset/icon_16x16@2x.png
+sips -z 32 32 icon-1024.png --out AppIcon.iconset/icon_32x32.png
+sips -z 64 64 icon-1024.png --out AppIcon.iconset/icon_32x32@2x.png
+sips -z 128 128 icon-1024.png --out AppIcon.iconset/icon_128x128.png
+sips -z 256 256 icon-1024.png --out AppIcon.iconset/icon_128x128@2x.png
+sips -z 256 256 icon-1024.png --out AppIcon.iconset/icon_256x256.png
+sips -z 512 512 icon-1024.png --out AppIcon.iconset/icon_256x256@2x.png
+sips -z 512 512 icon-1024.png --out AppIcon.iconset/icon_512x512.png
+sips -z 1024 1024 icon-1024.png --out AppIcon.iconset/icon_512x512@2x.png
+iconutil -c icns AppIcon.iconset -o AppIcon.icns
+```
+
+## packager.json
+
+**Bun**（单个二进制文件）：
+
+```json
+{
+  "productName": "My App",
+  "version": "0.1.0",
+  "identifier": "dev.example.app",
+  "binariesDir": "dist",
+  "outDir": "bundle",
+  "binaries": [{ "path": "app", "main": true }],
+  "icons": ["AppIcon.icns"],
+  "formats": ["app"]
+}
+```
+
+```bash
+cargo packager --release --config packager.json
+open "bundle/My App.app"
+```
+
+**Hermes** 需要把 `.node` 放在 exe 旁边。请把它列为**第二个二进制文件**，而非资源。资源放在 `Contents/Resources`。`dlopen` 会在 `Contents/MacOS` 中查找。
+
+```json
+{
+  "binaries": [
+    { "path": "gpuix-hermes", "main": true },
+    { "path": "gpuix-native.darwin-arm64.node", "main": false }
+  ]
+}
+```
+
+`formats` 仅针对宿主操作系统：
+
+| OS | `formats` | 输出 |
+|---|---|---|
+| macOS | `"app"`，然后 `"dmg"` | `.app`，可选的 `.dmg` |
+| Windows | `"nsis"` | setup `.exe` |
+| Linux | `"appimage"` | `.AppImage` |
+
+## 输出文件名
+
+使用 `productName: "My App"`、`version: "0.1.0"` 以及 `binaries: [{ "path": "app", "main": true }]` 时，packager 会写出：
+
+| OS | `formats` | `outDir`（`bundle/`）中的文件 |
+|---|---|---|
+| macOS | `"app"` | `My App.app`，签名后再生成 `My App.app.tar.gz` + `My App.app.tar.gz.sig` |
+| Linux | `"appimage"` | `app_0.1.0_x86_64.AppImage` + `.sig` |
+| Windows | `"nsis"` | `app_0.1.0_x64-setup.exe` + `.sig` |
+
+<Callout type="important" title="三个容易踩的命名细节">
+  - macOS 的更新器需要的是 **`.app.tar.gz`**，而不是 `.app`，也不是 `.dmg`。Packager 只有在签名时才会给 `.app` 打 tar 包。
+  - Linux 与 Windows 的文件名使用**二进制词干**（binary stem，即 `app`），而非 `productName`。
+  - NSIS 的架构是 `x64`，而非 `x86_64`。若缺少同级的 `.sig` 会报错。
+</Callout>
+
+## --release 是什么
+
+Packager 只构建**宿主**操作系统。请在 macOS、Linux 与 Windows 上分别运行。
+
+`--release` 是 packager 的 profile（在 `binariesDir` 中查找 release 二进制）。它不是 `cargo build --release`。当设置了签名相关的环境变量时，签名会自动进行。来源：[cargo-packager CLI](https://docs.rs/cargo-packager/latest/cargo_packager/)。
+
+## 加上自动更新
+
+签名只需执行一次，接下来就可以让应用自我更新。见[自动更新](/docs/auto-update)。

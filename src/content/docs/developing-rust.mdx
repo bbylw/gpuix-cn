@@ -1,0 +1,47 @@
+---
+title: 开发 Rust 侧
+description: '为什么原生模块无法热重载、重新编译的实际耗时，以及 bun run dev 的工作流。'
+eyebrow: 参考
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+JS 重挂载已在[热重载](/docs/hot-reload)里讲过。原生那一半**没有热重载**，也不可能做到：对 `.node` 文件的 `require()` 会调用 `process.dlopen`，而 Node 没有配套的卸载，活动状态（GPUI 的平台、GPU 设备、已打开的窗口、UI 线程以及选区注册表）都留在已加载的库里。第二次加载会在第一个库仍被加载的同时创造出独立的原生状态。
+
+重新编译足够快，所以其实无所谓。在一台 M 系列 Mac 上改动一个文件后实测：
+
+| 步骤 | 耗时 |
+|---|---|
+| `cargo check --lib` | 1.5s |
+| `cargo build --lib` | 4.9s |
+| `bun run build:debug` (napi) | ~2s |
+| 单个 vitest 截图文件 | ~2s |
+
+`bun run dev` 把这套流程串成一个循环：它监视 `packages/native/src`，重新编译并重渲染截图测试。**从改动 Rust 到生成新 PNG 大约 4 秒。**
+
+```bash
+bun run dev                      # rebuild, re-render the showcase screenshots
+bun scripts/dev.ts --shots diff  # only tests matching "diff"
+bun scripts/dev.ts --app native-text   # rebuild, restart an example app
+```
+
+<Callout type="tip">
+  截图模式是更好的默认选择。用 Preview.app 打开 `packages/react/screenshots/showcase.png`，它会在写入时自动刷新；而且与现实窗口不同，PNG 也能被 agent 读取。
+</Callout>
+
+## 两件完全避免重新编译的事
+
+- **内容**本身就在 props 里。修改 `patch` 或 `source`，下一帧就会显示。
+- **设计数值**在 `theme.metrics` 里。调整行高或标题字号只是一次 React 重渲染。
+
+参见[原生文本组件](/docs/native-text#布局数字也住在主题里)。
+
+## 确定性调度
+
+测试渲染器使用 `VisualTestAppContext` 配合 `TestDispatcher` 来实现确定性调度。事件模拟走的是 GPUI 基于坐标的命中测试与派发 —— 而不是合成的 JS 事件。
+
+详见[测试](/docs/testing)。
+
+## 贡献指南
+
+详细的架构、通信流程与贡献指南见 [AGENTS.md](https://github.com/remorses/gpuix/blob/main/AGENTS.md)。

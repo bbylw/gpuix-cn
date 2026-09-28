@@ -1,0 +1,92 @@
+---
+title: 自动更新
+description: 'checkUpdate 的端点约定、签名产物与命名规则，以及更新后为什么必须退出。'
+eyebrow: 打包与发布
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+打包**不会**自动开启更新。运行中的应用会调用 `@gpuix/native` 上的 `checkUpdate`。HTTP 使用的是与 `<img>` 相同的 `reqwest_client`。不存在第二个原生插件。
+
+## 托管到 GitHub Releases
+
+先创建 release。CI 会在每个操作系统上打包、签名，并上传 bundle 及其 `.sig`。应用会访问 `https://github.com/OWNER/REPO/releases/latest`。它会被重写为 `https://api.github.com/repos/OWNER/REPO/releases/latest`。更新器读取 `tag_name` 与 `assets`，然后 GET 同级的 `{name}.sig`。
+
+## 只需签名一次
+
+```bash
+cargo packager signer generate
+```
+
+将私钥及其密码作为仓库密钥 `CARGO_PACKAGER_SIGN_PRIVATE_KEY` 与 `CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD` 存储。把**公钥**放入应用。
+
+```tsx
+import { checkUpdate } from '@gpuix/native'
+import { render } from '@gpuix/react'
+import { App } from './app'
+
+async function maybeUpdate() {
+  const update = await checkUpdate('0.1.0', {
+    endpoints: ['https://github.com/OWNER/REPO/releases/latest'],
+    pubkey: '<public key from signer generate>',
+  })
+  if (update) await update.downloadAndInstall()
+}
+
+maybeUpdate()
+render(<App />)
+```
+
+`https://github.com/OWNER/REPO` 是同一个端点。
+
+## 上传产物
+
+请自行创建 GitHub release，然后再打包并上传。`--clobber` 会在 CI 重试时替换某个 asset。不要上传 feed JSON。
+
+```bash
+# macOS
+bun build --compile app.tsx --outfile dist/app
+cargo packager --release --config packager.json
+gh release upload v0.1.0 \
+  "bundle/My App.app.tar.gz" \
+  "bundle/My App.app.tar.gz.sig" \
+  --clobber
+
+# Linux
+bun build --compile app.tsx --outfile dist/app
+cargo packager --release --config packager.json
+gh release upload v0.1.0 \
+  bundle/app_0.1.0_x86_64.AppImage \
+  bundle/app_0.1.0_x86_64.AppImage.sig \
+  --clobber
+
+# Windows
+bun build --compile app.tsx --outfile dist/app.exe
+cargo packager --release --config packager.json
+gh release upload v0.1.0 \
+  bundle/app_0.1.0_x64-setup.exe \
+  bundle/app_0.1.0_x64-setup.exe.sig \
+  --clobber
+```
+
+<Callout type="important" title="更新后必须退出进程">
+  `downloadAndInstall()` 会替换已打包的文件。它**不会**自动重启。请在它返回后退出，否则下次启动用的还是旧应用。
+</Callout>
+
+## 平台支持
+
+HTTPS 支持位于原生 crate 中。这在 **Bun** 与 **hermes-node** 上可用。它在浏览器的 wasm 构建中不存在。
+
+仓库必须是 **public** 的，否则 GitHub 的 API 会返回 404。可选：在 `api.github.com` 前放一层 Cloudflare 缓存。用的是同一份 GitHub JSON，并非自定义 schema。
+
+## 文件名约定
+
+这些约定必须与 packager 的输出一致，否则更新器会找不到同级的 `.sig`：
+
+| OS | 需要上传的文件 |
+|---|---|
+| macOS | `My App.app.tar.gz` + `My App.app.tar.gz.sig` |
+| Linux | `app_0.1.0_x86_64.AppImage` + `.sig` |
+| Windows | `app_0.1.0_x64-setup.exe` + `.sig` |
+
+详见[打包成带图标的 App](/docs/packaging#输出文件名)。

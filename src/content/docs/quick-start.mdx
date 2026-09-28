@@ -1,0 +1,81 @@
+---
+title: 快速开始
+description: 用三行命令创建第一个 GPUIX 应用：用 TypeScript 编写 React 组件树，由 GPUI 通过 Metal、DirectX 或 Vulkan 绘制。
+eyebrow: 新手指南
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+**React 与 Solid** 可以用于 [GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui) —— Zed 的 GPU UI 框架。
+
+用 TypeScript 编写 React 或 Solid 组件树。GPUIX 使用 Metal、DirectX 或 Vulkan 将其绘制出来。没有 Electron，也没有 WebView。
+
+`useState` 与 JSX 依旧可用。布局、文本与输入都经由 GPUI 处理，而非 DOM。
+
+## 三行命令
+
+通过官方示例创建一个应用。该命令只会下载 `example-app/` 并安装它的依赖。无需克隆仓库、原生构建或安装 Rust 工具链。
+
+```bash
+bunx @gpuix/cli new my-app
+cd my-app
+bun run dev
+```
+
+`@gpuix/react` 会拉取对应你平台的原生渲染器。编辑 `app.tsx`，运行中的窗口会在保存时重新挂载。点击与键盘处理器会切换到新的组件树，而无需重建窗口。
+
+<Callout type="tip" title="你用 Solid 1 吗">
+  如果你用的是 Solid 而非 React，请从 [Solid 快速开始](/docs/solid) 入手。
+</Callout>
+
+## 第一个应用长什么样
+
+整个应用就是一个 `app.tsx`。`useState`、事件处理器与内联样式都和 React 里一样：
+
+```tsx
+import { useState } from 'react'
+import { render } from '@gpuix/react'
+
+function App() {
+  const [count, setCount] = useState(0)
+  return (
+    <div style={{ padding: 24, backgroundColor: '#1a1a1a', height: '100%' }}>
+      <div
+        onClick={() => setCount((c) => c + 1)}
+        style={{
+          padding: 12,
+          borderRadius: 8,
+          cursor: 'pointer',
+          backgroundColor: '#232323',
+          hover: { backgroundColor: '#2c2c2c' },
+        }}
+      >
+        <text style={{ color: '#e2e2e2' }}>Count: {count}</text>
+      </div>
+    </div>
+  )
+}
+
+render(<App />, { title: 'My App', width: 800, height: 600 })
+```
+
+以 `bun --hot` 运行它：
+
+```bash
+bun --hot app.tsx
+```
+
+使用 `bun --hot`，而不是普通的 `bun`。这样保存时会在同一个窗口上重新挂载 React，而非打开第二个窗口。
+
+<Callout type="important">
+  **给每一处 `<text>` 都设置 `color`。** GPUI 不会从父元素继承 `color`，因此没有颜色的文本会被绘制成**黑色**，在深色表面上会消失不见。
+</Callout>
+
+## 接下来
+
+| 目标 | 页面 |
+|---|---|
+| 不想要示例应用，自己装依赖 | [从零开始构建](/docs/from-scratch) |
+| 看运行起来的应用长什么样 | [示例](/docs/examples) |
+| 理解它为什么能跑起来 | [架构](/docs/architecture) |
+| 打包成可分发的 App | [打包成带图标的 App](/docs/packaging) |

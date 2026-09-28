@@ -1,0 +1,88 @@
+---
+title: 测试
+description: 'GPU 支撑的测试渲染器、低层事件模拟 API，以及断言数字而非像素的写法。'
+eyebrow: 自动化
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+[自动化](/docs/automation)里的定位器构建在一个 **GPU 支撑的测试渲染器**（`TestGpuixRenderer`）之上。它与生产环境运行相同的 `GpuixView`、`build_element()`、`apply_styles()` 与事件处理程序。测试窗口被放置在屏幕外，并由 macOS 上的 Metal 或 Windows 上的 DirectX 渲染。当定位器不够用时，下面这些方法是更底层的 API。
+
+| 平台 | 测试渲染器 | PNG 捕获 |
+|---|---|---|
+| macOS | Metal | 支持 |
+| Windows | DirectX | 支持 |
+| Linux | 暂不支持 | 等待 GPUI 的 wgpu 无头渲染器 |
+
+```ts
+import { createTestRoot } from '@gpuix/react/testing'
+
+const { root, renderer } = createTestRoot()
+
+root.render(<MyComponent />)
+renderer.flush()  // 在原生 GPU 上触发 GpuixView::render()
+
+// 通过 GPUI 的原生输入管线模拟事件
+renderer.nativeSimulateClick(50, 50)
+renderer.nativeSimulateKeystrokes('enter')
+
+// 检查结果
+const events = renderer.drainNativeEvents()
+renderer.captureScreenshot('/tmp/test.png')
+const text = renderer.getAllText()
+```
+
+## 测试原生元素
+
+`getAllText()` 只能看到留存树中的 `<text>` 节点。`<code>`、`<diff>` 与 `<markdown>` 是在 GPUI 内部绘制文本的，因此要用 `getPaintedText()`，它会按绘制顺序返回最后一帧里绘制的所有字符串：
+
+```ts
+root.render(<code code={'a\nb'} language="ts" />)
+expect(renderer.getPaintedText()).toEqual(['a', 'b'])
+```
+
+选区有专门的辅助方法。监听器是在**绘制**期间注册的，所以 `dragSelect` 会在每一步之间刷新；如果没有这些刷新，手动调用 `simulateMouseDown` / `Move` / `Up` 将选不中任何内容：
+
+```ts
+expect(renderer.dragSelect(20, 30, 900, 300)).toBe('first line\nsecond line')
+```
+
+高亮是一个**四边形（quad）**，所以无论怎么 `getPaintedText()` 都看不到它。请用 `getPaintedHighlights()`，它会以 UTF-16 单位报告匹配范围，以及它实际绘制的盒子（每个可视行一个）：
+
+```ts
+root.render(
+  <div highlight={{ query: 'quick' }}>
+    <text>the quick brown fox</text>
+  </div>,
+)
+const [hit] = renderer.getPaintedHighlights()
+expect(hit.text.slice(hit.start, hit.end)).toBe('quick')
+expect(hit.rects).toHaveLength(1)
+```
+
+## 断言数字，而非像素
+
+对于一个有状态的交互面，把你想断言的状态绘制进一个 **readout** 元素，再用 `textContent()` 读取。截图只告诉你有东西变了；readout 会告诉你变了什么，而且失败信息会直接给出那个数字。
+
+```tsx
+<text testId="readout">{`x=${scrollX} y=${scrollY} zoom=${zoom} sel=${selected}`}</text>
+```
+
+```ts
+const readout = await app.getByTestId('readout').textContent()
+expect(readout).toBe('x=140 y=60 zoom=24 sel=clip-7')
+```
+
+[`examples/timeline.test.tsx`](https://github.com/remorses/gpuix/blob/main/examples/timeline.test.tsx) 里的每个测试都用这种方式工作，包括拖拽、裁剪、吸附与缩放手势。同时保留截图，供运行后人工查看。
+
+<Callout type="important" title="性能采样必须包含 renderer.flush()">
+  否则你计时的只是 React 更新，而不包含随后发生的任何 GPUI 构建、布局与绘制。参见[虚拟列表](/docs/virtual-list#可平移表面必须裁剪)中的 p50 对比。
+</Callout>
+
+## 截图落盘位置
+
+截图落在 `packages/react/screenshots/` 与 `examples/screenshots/`，两者都在 gitignore 中，因此可在运行后检查，而不会给每次提交增加一个二进制 diff。README 引用的精选图集位于 `docs/images/`，可用以下命令重新生成：
+
+```bash
+bun scripts/screenshots.ts
+```

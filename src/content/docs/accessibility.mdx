@@ -1,0 +1,59 @@
+---
+title: 无障碍
+description: '属性映射、默认 role 表格，以及哪些 props 在浏览器渲染器中只是空操作。'
+eyebrow: 组件
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+GPUI 通过 AccessKit 与 **macOS AX 树**、Windows UIA 以及 Linux AT-SPI 通信。GPUIX 把 React 的 props 映射到这套 API 上。一个节点只有在**同时**拥有 GPUI id（始终设置）和一个 **role** 时，才会进入这棵树。
+
+属性名与 React DOM 一致。role 的**取值**是 ARIA 令牌，而非 AccessKit 的 PascalCase。`"none"` 与 `"presentation"` 不会产生节点。
+
+```tsx
+<div
+  role="button"
+  aria-label="Delete note"
+  aria-description="Removes this note"
+  aria-id="notes.delete"
+  onClick={remove}
+>
+  Delete
+</div>
+```
+
+| 属性 | GPUI / AccessKit |
+|---|---|
+| `role` | `.role(Role::…)` |
+| `aria-label` | 可访问名称（accessible name） |
+| `aria-description` | 名称、角色、取值之后的额外描述 |
+| `aria-id` | `AXIdentifier` / UIA AutomationId |
+| `aria-expanded` | 展开状态 |
+| `aria-selected` | 选中状态 |
+| `aria-valuetext` | 字符串取值 |
+| `aria-level` | 标题层级 |
+
+## 原生默认值
+
+原生默认值意味着常见元素不会「沉默」：
+
+| 元素 | 默认 role | 名称 / 取值 |
+|---|---|---|
+| `<text>` | `Label` | 内容作为 `aria-valuetext` |
+| `<input>` | `TextInput` | `value` 与 `placeholder` |
+| `<textarea>` | `MultilineTextInput` | `value` 与 `placeholder` |
+| `<img>` | `Image` | `alt` 作为 `aria-label` |
+
+显式的 `role` 会覆盖这些默认值。
+
+<Callout type="important">
+  **一个可点击的 `div` 在你设置 `role="button"` 之前不是按钮。** `onClick` 会注册 AccessKit 的 `Click`，因此 VoiceOver 的 Press 会触发同一个 JS `click` 处理器，但它仍然不会进入 Tab 顺序 —— 那需要 [`tabIndex`](/docs/focus-keyboard) 或 `Button` 原语。
+</Callout>
+
+<Callout type="note">
+  浏览器 / wasm 渲染器没有 AccessKit 适配器。这些 props 在那里是空操作（no-op）。
+</Callout>
+
+## 与内置原语的关系
+
+`Button`、`Dialog.Trigger`、`Dialog.Close` 等[内置原语](/docs/headless-controls)已经设置了正确的 role 与键盘行为，因此优先使用它们，而不是手写带 `role` 的 `div`。

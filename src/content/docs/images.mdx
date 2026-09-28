@@ -1,0 +1,158 @@
+---
+title: 图像与图标
+description: img 接受文件系统路径、data URL 或 http(s) URL；svg 使用 GPUI 的单色图标渲染器。
+eyebrow: 组件
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+## `<img>`
+
+`<img>` 通过 GPUI 的图像元素绘制。它从磁盘、data URL 或 http(s) 加载 **PNG、JPEG、WebP、GIF、SVG、BMP、TIFF、ICO 以及 Netpbm**。这里的 SVG 是一张全彩图像，而非可染色的图标。
+
+```tsx
+<img
+  src={fileURLToPath(new URL('./photo.png', import.meta.url))}
+  objectFit="cover"
+  style={{ width: 240, height: 140, borderRadius: 12 }}
+/>
+```
+
+```tsx
+const src = `data:image/png;base64,${Buffer.from(pngBytes).toString('base64')}`
+
+<img src={src} style={{ width: 240, height: 140 }} />
+```
+
+```tsx
+<img
+  src="https://example.com/avatar.png"
+  objectFit="cover"
+  style={{ width: 48, height: 48, borderRadius: 24 }}
+/>
+```
+
+<Callout type="important">
+  **必须同时设置 `width` 和 `height`。** GPUI 在后台任务里抓取并解码，组件树不会等待。如果没有确定尺寸，盒子在解码前是空的，解码后会跳到位图尺寸。
+</Callout>
+
+Data URL 支持上面列出的所有图像格式，接受 base64 与百分号编码的载荷。远程 URL 与磁盘文件共用同一套 GPUI 图像缓存，不会被写入临时文件。
+
+`objectFit` 与 CSS 一致：`"contain"`（默认）、`"cover"`、`"fill"`、`"scaleDown"` 或 `"none"`。空的 `src` 或加载失败会显示一个兜底占位符，而不会崩溃。仍在加载的 URL 会画出一块声明尺寸的空盒子，没有加载转圈。
+
+`borderRadius` 会裁剪位图，GPUI 按这些圆角绘制图像。父级的 `overflow: "hidden"` 包裹层**不会**裁剪 `<img>` 子元素，请把圆角直接写在图像上。
+
+```tsx
+<img
+  src={avatarUrl}
+  objectFit="cover"
+  style={{ width: 32, height: 32, borderRadius: 16 }}
+/>
+```
+
+## 来自缓冲区的实时图像
+
+Data URL 依然可用，但它会把字节 base64 编码进变更 JSON 里。对于波形、canvas 导出，或任何你已存在于内存中的帧，直接通过 `<img>` 的 ref 推送**原始字节**，这个调用会跳过 JSON。
+
+`setImage` 接受已编码的 **PNG、JPEG、WebP、GIF、SVG、BMP、TIFF、ICO 或 Netpbm**。`setImagePixels` 默认接受打包的 **RGBA**。实时波形优先用像素，没有 PNG 编码，也没有 JSON。
+
+当你的数据源本身就产出 **BGRA** 时，传入 `{ format: 'bgra' }`。这是 GPUI 的原生顺序，因此上传会跳过一次逐像素的 swizzle。ffmpeg（`-pix_fmt bgra`）、VideoToolbox 与 node-canvas 的 `toBuffer('raw')` 都产出它。
+
+```ts
+img.current?.setImagePixels(width, height, rgba)
+img.current?.setImagePixels(width, height, bgra, { format: 'bgra' })
+```
+
+<Callout type="warning" title="不要在调用前压缩帧">
+  PNG 或 JPEG 编码的代价远高于它省下的那点拷贝。
+</Callout>
+
+两者都可以在挂载后于 `useLayoutEffect` 中调用。后续 React `src` 的**变更**会覆盖这些像素。Alpha 是直通（straight）的，而非预乘（premultiplied）。
+
+**没有** density 参数。`setImagePixels` 上的 `width` 和 `height` 是位图像素，`style.width` 和 `style.height` 是布局盒子。在 retina 屏幕上，应按盒子尺寸的 **2x**（或 `devicePixelRatio`）上传，否则 GPUI 会把一个逻辑像素拉伸成四个屏幕像素。
+
+```tsx
+import { createCanvas } from 'canvas'
+import { useLayoutEffect, useRef } from 'react'
+import type { ImgInstance } from '@gpuix/react'
+
+function Waveform({ samples }: { samples: Float32Array }) {
+  const img = useRef<ImgInstance>(null)
+
+  useLayoutEffect(() => {
+    const width = 1600
+    const height = 160
+    const canvas = createCanvas(width, height)
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#1a1a2e'
+    ctx.fillRect(0, 0, width, height)
+    ctx.strokeStyle = '#5ca9ff'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    for (let x = 0; x < samples.length; x++) {
+      const y = height / 2 - samples[x]! * (height / 2 - 8)
+      if (x === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
+    ctx.stroke()
+    img.current?.setImagePixels(width, height, canvas.toBuffer('raw'), {
+      format: 'bgra',
+    })
+  }, [samples])
+
+  return <img ref={img} objectFit="fill" style={{ width: 800, height: 80 }} />
+}
+```
+
+node-canvas 的 `toBuffer('raw')` 在小端机器上（所有 Apple Silicon、x86 与 ARM64 桌面机）是 **BGRA**，且无行内填充。它是**预乘**的，而 GPUIX 期望直通 alpha，两者只有在像素不透明时才一致，所以示例先填充背景。对于透明 canvas，请用 `getImageData().data` 并以默认的 `'rgba'` 格式。
+
+[波形示例](https://github.com/remorses/gpuix/blob/main/examples/waveform.tsx) 就是手写 BGRA、按 2x 上传的。
+
+## `<svg>`
+
+`<svg>` 使用 GPUI 的**单色图标渲染器**。原始 `source` 在桌面端和浏览器里都有效。桌面应用也能用本地 `src` 路径。图标作为一个形状被绘制，并用 `style.color` 上色。
+
+<Callout type="tip">
+  对于应用图标，优先用**原始 SVG 源码**。它能同时兼容 GPUIX 两个目标平台，并让打包器把每个图标内联进 JavaScript 包。只有当桌面应用有意分发松散的资源文件时才用 `src`。
+</Callout>
+
+`src` 是文件系统路径**或**一个 `data:image/svg+xml,…` URL。Vitest 与部分 Bun 的 `import … with { type: 'file' }` 绑定会输出 data URL，GPUIX 两者都能解码。
+
+<Callout type="important">
+  `style.color` 是必需的。没有它图标不会绘制。优先在文件里使用 `fill="#000"` 或 `stroke="#000"`。SVG 中的 `currentColor` 与 `style.color` 不是同一回事。
+</Callout>
+
+### Bun
+
+用 Bun 的 [`text` loader](https://bun.sh/docs/bundler/loaders#text)。该导入是一个包含完整 SVG 的字符串，`bun build` 会把它嵌入产物中。
+
+```tsx
+import searchSvg from './assets/icons/search.svg' with { type: 'text' }
+
+<svg
+  source={searchSvg}
+  style={{ width: 16, height: 16, color: '#b4b4b4' }}
+/>
+```
+
+聊天示例就是这样用原始 SVG 源码构建出每个侧边栏与输入栏图标的。
+
+### Node.js
+
+对于受支持的 Node.js 版本，相对模块读取一次图标即可。用 `URL` 可以跨操作系统保持路径正确，并避开 `__dirname`。
+
+```tsx
+import { readFileSync } from 'node:fs'
+
+const searchSvg = readFileSync(
+  new URL('./assets/icons/search.svg', import.meta.url),
+  'utf8',
+)
+
+<svg
+  source={searchSvg}
+  style={{ width: 16, height: 16, color: '#b4b4b4' }}
+/>
+```
+
+Node.js 也有 [text modules](https://nodejs.org/api/esm.html#text-modules)，但当前需要 `--experimental-import-text`。在 text import 不再需要运行时标志之前，优先用 `readFileSync`。

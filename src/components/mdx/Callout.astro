@@ -1,0 +1,50 @@
+---
+/**
+ * 提示框。承载 README 中的 `> [!IMPORTANT]` / `> [!NOTE]` 语义，
+ * 在 MDX 中以 <Callout type="important"> 形式书写。
+ *
+ * 配色克制：底色与正文一致，只有左侧竖线、图标与标签带语义色。
+ */
+import { Icon } from 'astro-icon/components'
+
+interface Props {
+  type?: 'note' | 'tip' | 'important' | 'warning' | 'danger'
+  title?: string
+}
+
+const { type = 'note', title } = Astro.props
+
+const styles: Record<string, { rule: string; tone: string; icon: string; label: string }> = {
+  note: { rule: 'bg-line-strong', tone: 'text-ink-muted', icon: 'ph:info', label: '说明' },
+  tip: { rule: 'bg-green', tone: 'text-green', icon: 'ph:lightbulb', label: '提示' },
+  important: {
+    rule: 'bg-accent',
+    tone: 'text-accent',
+    icon: 'ph:seal-check-fill',
+    label: '重要',
+  },
+  warning: { rule: 'bg-amber', tone: 'text-amber', icon: 'ph:warning-octagon-fill', label: '注意' },
+  danger: { rule: 'bg-rose', tone: 'text-rose', icon: 'ph:x-circle', label: '警告' },
+}
+
+const style = styles[type] ?? styles.note
+---
+
+<aside class="relative my-6 rounded-r-[5px] bg-canvas-subtle py-3.5 pr-4 pl-5">
+  <span
+    aria-hidden="true"
+    class:list={['absolute inset-y-0 left-0 w-[2px] rounded-full', style.rule]}
+  >
+  </span>
+  <div class="flex gap-2.5">
+    <Icon
+      name={style.icon}
+      class:list={['mt-[0.15rem] size-4 shrink-0', style.tone]}
+      aria-hidden="true"
+    />
+    <div class="min-w-0 flex-1 text-[0.9375rem] leading-relaxed text-ink-soft [&>*+*]:mt-2.5 [&>p]:m-0">
+      <p class:list={['mb-1 text-[12px] font-semibold', style.tone]}>{title ?? style.label}</p>
+      <slot />
+    </div>
+  </div>
+</aside>

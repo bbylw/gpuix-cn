@@ -1,0 +1,82 @@
+---
+title: 后台启动与 agent 驱动
+description: 'focus: false 与 show: false 让窗口不抢焦点。自动化并不需要焦点，因此 agent 可以驱动应用而不打断你。'
+eyebrow: 窗口与渲染器
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+`focus: false` 会以**不抢占焦点**的方式打开窗口。你正在输入的应用会保留光标与活跃标题栏。`show: false` 则更进一步，根本不打开任何窗口，于是进程带着一个存活的 React 树运行，但屏幕上什么都没有。
+
+```tsx
+render(<App />, { title: 'Notes', focus: false })
+```
+
+<Callout type="important">
+  **只要由编码 agent 运行你的应用，就该开启这个选项。** 否则，一个为了检查成果而启动应用的 agent，会在每次迭代时把这个窗口猛地拽到你正在做的事情前面，哪怕你话才说到一半。使用 `focus: false` 后，agent 依然能拿到一个真实的、由 GPU 渲染的窗口来截图和点击，而你则可以保留自己的编辑器。
+</Callout>
+
+| 平台 | `focus: false` | `show: false` |
+|---|---|---|
+| macOS | 窗口排到最前但不成为 key 窗口，类似 `open -g` | 生效 |
+| Windows | `SW_SHOWNOACTIVATE` | 生效 |
+| Linux | **被忽略**，窗口以聚焦状态打开 | **被忽略** |
+
+在 macOS 上，进程仍然会获得一个 **Dock 图标**。GPUI 设置的是常规激活策略，因此目前还没有菜单栏代理（menu-bar-agent）模式。若要真正的后台守护进程，请从 `~/Library/LaunchAgents/` 下的 `launchd` agent 来运行应用；launchd 永远不会激活该进程。
+
+## 让 agent 来驱动应用
+
+通过环境变量让焦点变为「按需开启」，这样人类运行时行为正常，而 agent 运行时不会来打扰你：
+
+```tsx
+render(<App />, {
+  title: 'Notes',
+  focus: process.env.GPUIX_BACKGROUND !== '1',
+})
+```
+
+```bash
+bun app.tsx                      # 你：窗口来到最前
+GPUIX_BACKGROUND=1 bun app.tsx   # agent：窗口在你的编辑器之后打开
+```
+
+`launch()` 会直接透传 `env`，因此 agent 脚本只需设置一次，之后每一次截图、点击与断言都运行在一个永远不会打断你的窗口上：
+
+```ts
+import { launch } from '@gpuix/react/automation'
+
+const app = await launch({
+  command: 'bun',
+  args: ['app.tsx'],
+  env: { GPUIX_BACKGROUND: '1' },
+})
+
+await app.getByTestId('bump').waitFor()
+await app.getByTestId('bump').click()
+await app.screenshot({ path: 'tmp/after-click.png' })
+await app.close()
+```
+
+唯一改变的是焦点。**自动化并不需要焦点。** `click()` 命中最后一次绘制的边界框，`screenshot()` 读取 GPU 表面，因此两者在窗口位于你编辑器之后时也能工作，甚至在根本不在屏幕上的 `show: false` 窗口上也能工作。
+
+```text
+  agent ──►  launch({ env: { GPUIX_BACKGROUND: '1' } })
+                │
+                ▼
+           GPU window renders and paints without activation
+                │
+                ├──►  getByTestId(..).click()   ✓  hits the last painted bounds
+                ├──►  screenshot({ path })      ✓  reads the GPU surface
+                ├──►  fill() / press()          ✓  uses the live input pipeline
+                └──►  close()
+
+  you   ──►  keep typing, your editor stays frontmost the whole time
+```
+
+`fill()` 与 `press()` 使用的是实时的 GPUI 窗口输入管线。它们无需激活桌面窗口即可工作。**Linux 会忽略 `focus`**，因此那里的 agent 仍然会拿到一个获得焦点的窗口。
+
+<Callout type="tip">
+  在可以的时候，优先使用 `createTestRoot()`。它**完全不打开窗口**，因此没有任何东西能抢走焦点，键盘输入也能正常工作。当检查需要一个真实的窗口、真实的 GPU 绘制或真实的进程时，再退而使用 `launch()` 加 `focus: false`。
+</Callout>
+
+完整的自动化 API 见[自动化](/docs/automation)。

@@ -1,0 +1,44 @@
+---
+title: 构建 GPUIX 自身
+description: 面向参与 GPUIX 开发的人：安装 Rust 工具链、检出被固定的 GPUI fork，并构建原生、React 与 Solid 包。
+eyebrow: 参考
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+本节面向**参与 GPUIX 自身开发**的人。若只是用它来构建应用，请改看[快速开始](/docs/quick-start)。安装这些包不需要 Rust 工具链，也不需要 submodule。
+
+## 前置条件
+
+1. Rust 工具链
+2. Node.js 18+
+3. 含 Metal Toolchain 的 Xcode（macOS）
+
+```bash
+# 如需要则安装 Metal Toolchain
+xcodebuild -downloadComponent MetalToolchain
+
+# 安装依赖
+bun install
+
+# 检出被固定的 GPUI fork
+git submodule update --init --recursive
+
+# 构建原生包
+cd packages/native
+bun run build
+
+# 构建 React 包
+cd ../react
+bun run build
+
+# 构建 Solid 包
+cd ../solid
+bun run build
+
+# 运行示例（长时会话建议使用 tmux）
+cd ../../examples
+bun --hot counter.tsx
+```
+
+更多开发流程见[开发 Rust 侧](/docs/developing-rust)。

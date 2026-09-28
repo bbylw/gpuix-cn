@@ -1,0 +1,183 @@
+---
+title: 自动化
+description: '三种宿主（测试 root、浏览器页面、子进程）共用一套客户端，含定位器、鼠标与时钟控制。'
+eyebrow: 自动化
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+用 **`testId`** 标记元素，然后像 Playwright 那样驱动它们。同一个客户端可在 vitest、浏览器页面内，以及针对子进程时使用。鼠标操作在三种宿主里都走普通的 GPUI 输入路径。
+
+```tsx
+<div testId="sidebar-collapse" onClick={onCollapse}>‹</div>
+<textarea testId="composer" value={draft} onChange={...} />
+<div testId="send" onClick={onSend}>↑</div>
+```
+
+```ts
+import { createTestRoot } from '@gpuix/react'
+import { connectTest } from '@gpuix/react/automation'
+import { ChatApp } from './chat'
+
+const { render, renderer } = createTestRoot()
+render(<ChatApp />)
+const app = await connectTest(renderer)
+
+await app.screenshot({ path: 'open.png' })
+
+await app.clock.pause()
+await app.getByTestId('sidebar-collapse').click()
+await app.clock.fastForward(200)
+await app.screenshot({ path: 'collapsed.png' })
+
+await app.getByTestId('composer').fill('hello gpuix')
+await app.getByTestId('send').click()
+await app.screenshot({ path: 'sent.png' })
+```
+
+这就是聊天示例。真正的测试位于 [`examples/chat.test.tsx`](https://github.com/remorses/gpuix/blob/main/examples/chat.test.tsx)。
+
+```text
+createTestRoot()          browser render()          launch({ command, args })
+       │                         │                              │
+       ▼                         ▼                              ▼
+connectTest(renderer)      globalThis.gpuix                child stdin / stdout
+       │                         │                              │
+       └─────────────────────────┴──► App / Locator ◄───────────┘
+                                  click, fill, query, clock
+```
+
+## 浏览器应用
+
+每次浏览器渲染都会把自动化 `App` 安装为 **`globalThis.gpuix`**。在 `render()` 返回后它始终可用，无需设置标志或独立的传输层。
+
+```ts
+await page.evaluate(async () => {
+  await globalThis.gpuix
+    .getByTestId('sidebar-collapse')
+    .click()
+
+  await globalThis.gpuix
+    .getByTestId('composer')
+    .fill('hello from Playwriter')
+
+  await globalThis.gpuix.clock.pause()
+  await globalThis.gpuix.clock.fastForward(200)
+})
+```
+
+浏览器全局对象支持定位器、输入、树与文本查询、边界、选区、滚动、焦点以及时钟控制。浏览器页面无法写入任意的本地截图路径，请用控制浏览器的工具来做：
+
+```ts
+await page.screenshot({ path: 'review/chat.png', scale: 'css' })
+```
+
+边界返回的是**画布像素**而非 CSS 像素，因为那是 GPUI 布局所用的坐标系。在 2x 屏幕上，坐标 `x: 44` 的 locator 对应 CSS `x: 22`。在把矩形交给浏览器工具之前要先做转换：
+
+```ts
+const scale = await page.evaluate(() => {
+  const canvas = document.querySelector('canvas')!
+  return canvas.width / canvas.clientWidth
+})
+const { bounds } = await page.evaluate(() =>
+  globalThis.gpuix.getByText('New Task').waitFor(),
+)
+await page.screenshot({
+  scale: 'css',
+  clip: {
+    x: bounds.x / scale,
+    y: bounds.y / scale,
+    width: bounds.width / scale,
+    height: bounds.height / scale,
+  },
+})
+```
+
+不要为此去读 `window.devicePixelRatio`。自动化工具可能在 GPUI 已经确定画布尺寸之后覆盖了视口缩放因子，那时两者就会产生分歧。
+
+## 定位器
+
+| 调用 | 匹配 |
+|---|---|
+| `app.getByTestId('send')` | `testId` 属性 |
+| `app.getByText('New chat')` | 节点自身的文本 |
+| `app.getByType('textarea')` | 宿主元素类型 |
+| `locator.getByText('...')` | 另一个定位器的后代 |
+
+`click()` 命中最后一次绘制边界的中心。`fill(text)` 替换获得焦点的编辑器内容。`press('enter')` 发送一个按键。`waitFor()` 会轮询直到恰好存在一个匹配。`textContent()` 返回节点自身及所有后代的文本，类似 DOM 的 `textContent`。
+
+## 鼠标、滚轮与拖拽
+
+| 调用 | 作用 |
+|---|---|
+| `locator.hover()` | 把指针移动到中心，从而触发悬停样式与工具提示 |
+| `locator.wheel(dx, dy)` | 在中心上触发一次滚轮事件 |
+| `locator.dragBy(dx, dy)` | 在中心按下、移动、松开 |
+| `locator.dragTo(target)` | 同上，但结束于另一个定位器或一个 `{ x, y }` 点 |
+| `app.mouse.move / down / up / click` | 窗口坐标系下的原始指针输入 |
+| `app.mouse.wheel(target, dx, dy)` | 在某个点或定位器上的滚轮事件 |
+| `app.mouse.drag(from, to)` | 在两个点、两个定位器或混合之间拖拽 |
+
+拖拽发送的是**插值的移动**而非一次跳跃，因为吸附、实时预览以及按移动提交只有在指针真正移动时才会出现。传入 `steps` 控制步数，传入 `offset` 让按下位置偏离中心。
+
+```ts
+await app.getByTestId('clip-7').dragBy(120, 0, { steps: 6 })
+await app.getByTestId('clip-7-trim-end').dragTo(app.getByTestId('clip-8'))
+await app.mouse.drag({ x: 240, y: 500 }, { x: 700, y: 620 })
+```
+
+每个鼠标调用都接受与 `press('cmd-a')` 相同语法的 **`modifiers`**，因此 cmd-滚轮缩放、shift-点击范围选择，以及 alt-拖拽复制都可被测试：
+
+```ts
+await app.getByTestId('canvas').wheel(0, 120, { modifiers: 'cmd' })
+await app.getByTestId('clip-8').click({ modifiers: 'shift' })
+```
+
+<Callout type="important" title="click() 需要已绘制的边界">
+  每个接受 `testId` 的元素都会记录它们，包括 `<img>`、`<svg>` 与 `<anchored>`。`<anchored>` 报告的是浮层自身而非其锚定触发器的盒子，所以即便浮层被延迟并吸附回窗口内侧，`click()` 依然会落在菜单上。
+
+  `<virtual-list>` 是例外，它不接受 `testId`。gpui 的列表不是交互元素，因此无从记录边界盒子。请把定位器放在包裹用的 `<div>` 上。
+</Callout>
+
+## 截图与时钟
+
+`app.screenshot({ path })` 把当前 GPU 帧写成 PNG。
+
+`app.clock.pause()`、`set(ms)` 与 `fastForward(ms)` 会冻结原生动画时间。用它可以在已知时间戳处捕获侧边栏动画：
+
+```ts
+const startedAt = await app.clock.pause()
+await app.getByTestId('sidebar-collapse').click()
+await app.captureFrames('review/sidebar', [
+  startedAt,
+  startedAt + 100,
+  startedAt + 200,
+])
+```
+
+## 实时应用
+
+`launch({ command, args })` 启动应用，并通过 stdin 以与 SSE `data:` 行相同的方式发送命令。应用仅在 stdin 是**管道**时才监听，因此普通的终端运行不受影响。没有 `data:` 前缀的行会被忽略，`console.log` 不会破坏消息。
+
+```ts
+import { launch } from '@gpuix/react/automation'
+
+const app = await launch({
+  command: 'bun',
+  args: ['examples/chat.tsx'],
+  env: { GPUIX_BACKGROUND: '1' },
+})
+await app.getByTestId('composer').fill('hello')
+await app.getByTestId('composer').press('enter')
+await app.getByText('hello').waitFor()
+await app.screenshot({ path: 'live.png' })
+await app.close()
+```
+
+<Callout type="warning">
+  每个实时应用检查都必须设置 `GPUIX_BACKGROUND=1`，并且应用的入口必须把该标志映射为 `focus: false`。在 macOS 与 Windows 上，自动化会走真实的窗口输入与绘制管线，但并不会激活窗口，因此占用用户键盘并无测试价值。Linux 目前忽略 `focus`。
+</Callout>
+
+`fill()` 与 `press()` 经由实时 GPUI 窗口输入管线派发，因此原生 `<input>` 与 `<textarea>` 元素接收的是 GPUI 的键盘与 IME 处理，而非仅供测试的输入路径。
+
+更多背景见[后台启动与 agent 驱动](/docs/background)。

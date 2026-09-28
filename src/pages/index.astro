@@ -1,0 +1,431 @@
+---
+import Base from '../layouts/Base.astro'
+import Header from '../components/Header.astro'
+import CodeEnhance from '../components/CodeEnhance.astro'
+import { Icon } from 'astro-icon/components'
+import { Code } from 'astro:components'
+import { Image } from 'astro:assets'
+import surface from '../assets/framebuffer-surface.png'
+import { docsNav } from '../lib/nav'
+
+const GITHUB = 'https://github.com/remorses/gpuix'
+const GPUI = 'https://github.com/zed-industries/zed/tree/main/crates/gpui'
+
+const heroCode = `import { useState } from 'react'
+import { render } from '@gpuix/react'
+
+function App() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div style={{ padding: 24, height: '100%' }}>
+      <div
+        onClick={() => setCount((c) => c + 1)}
+        style={{
+          padding: 12,
+          borderRadius: 8,
+          backgroundColor: '#232323',
+        }}
+      >
+        <text style={{ color: '#e2e2e2' }}>
+          Count: {count}
+        </text>
+      </div>
+    </div>
+  )
+}
+
+render(<App />, { width: 800, height: 600 })`
+
+const installSteps = [
+  { verb: '创建', cmd: 'bunx @gpuix/cli new my-app', note: '下载官方示例应用并装好依赖' },
+  { verb: '进入', cmd: 'cd my-app', note: '一个文件的应用：app.tsx' },
+  { verb: '运行', cmd: 'bun run dev', note: '保存即在同一个窗口里重挂载' },
+]
+
+const pipeline = [
+  { stage: '组件树', body: '你写的 JSX 与 useState，标准 React 或 Solid。' },
+  { stage: 'GPUI 元素', body: '布局、文本测量、命中测试全部在 Rust 侧完成。' },
+  { stage: '渲染后端', body: 'Metal、DirectX 或 Vulkan，按平台选一个。' },
+  { stage: '屏幕像素', body: '没有 DOM，没有 WebView，没有转译层。' },
+]
+
+const metrics = [
+  { value: '3', label: '桌面渲染后端' },
+  { value: '0', label: 'WebView' },
+  { value: '82 MB', label: 'Bun 版 .app' },
+]
+---
+
+<Base
+  title="GPUIX：用 React 或 Solid 编写 GPU 原生桌面界面"
+  description="用 TypeScript 编写 React 或 Solid 组件树，GPUIX 使用 Metal、DirectX 或 Vulkan 将其绘制出来。没有 Electron，也没有 WebView。"
+>
+  <Header />
+
+  <main id="main">
+    <!-- ============ 首屏：非对称分栏 ============ -->
+    <section class="border-b border-line">
+      <div
+        class="mx-auto grid max-w-[78rem] items-center gap-12 px-5 pt-14 pb-16 sm:px-8 lg:grid-cols-[1fr_minmax(0,27rem)] lg:gap-16 lg:pt-20 lg:pb-20"
+      >
+        <div>
+          <h1
+            class="rise rise-1 text-[length:var(--text-hero)] leading-[1.1] font-semibold tracking-[-0.032em] text-balance text-ink"
+          >
+            React 的写法，<br class="hidden sm:block" />GPU 的渲染管线
+          </h1>
+          <p class="rise rise-2 mt-5 max-w-[44ch] text-lg leading-relaxed text-pretty text-ink-muted">
+            用 TypeScript 写 React 或 Solid 组件树，GPUIX 把它交给 GPUI，由 Metal、DirectX 或
+            Vulkan 直接画出来。没有 Electron，也没有 WebView。
+          </p>
+          <div class="rise rise-3 mt-9 flex flex-wrap items-center gap-3">
+            <a
+              href="/docs/quick-start"
+              class="inline-flex h-11 items-center gap-2 rounded-[6px] bg-accent px-5 text-sm font-medium text-accent-ink transition-colors hover:bg-accent-hover active:translate-y-[1px]"
+            >
+              开始使用
+              <Icon name="ph:arrow-right-bold" class="size-4" aria-hidden="true" />
+            </a>
+            <a
+              href="/docs/architecture"
+              class="inline-flex h-11 items-center rounded-[6px] border border-line-strong px-5 text-sm font-medium text-ink transition-colors hover:bg-surface active:translate-y-[1px]"
+            >
+              看它怎么工作
+            </a>
+          </div>
+        </div>
+
+        <div class="rise rise-2 min-w-0">
+          <div class="code-frame">
+            <div class="code-toolbar">
+              <span class="code-lang">app.tsx</span>
+              <span class="label-mono">一个文件的全部</span>
+            </div>
+            <Code code={heroCode} lang="tsx" class="scroll-slim overflow-auto px-4 py-3.5 text-[12.5px]" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 管线：横向轨 ============ -->
+    <section class="border-b border-line py-16 sm:py-20">
+      <div class="mx-auto max-w-[78rem] px-5 sm:px-8">
+        <h2
+          class="text-[length:var(--text-title)] leading-tight font-semibold tracking-[-0.022em] text-balance text-ink"
+        >
+          从组件树到像素，中间没有浏览器
+        </h2>
+        <p class="mt-3 max-w-[58ch] text-pretty leading-relaxed text-ink-muted">
+          <a
+            href={GPUI}
+            target="_blank"
+            rel="noreferrer noopener"
+            class="underline decoration-line-strong underline-offset-4 transition-colors hover:text-ink"
+            >GPUI</a
+          >{" "}
+          是 Zed 编辑器用来绘制自己的那套 GPU UI 框架。GPUIX 把 JSX 接到它的元素协议上，所以
+          <code class="rounded-[4px] bg-surface px-1.5 py-0.5 font-mono text-[0.85em]">hover</code>
+          之类的样式写在 Rust 里，而不是 CSS 里。
+        </p>
+
+        <ol class="mt-10 grid border-t border-line sm:grid-cols-2 lg:grid-cols-4">
+          {
+            pipeline.map((step, i) => (
+              <li class="border-b border-line px-0 py-5 sm:px-6 sm:first:pl-0 sm:last:pr-0">
+                <span
+                  class:list={[
+                    'block h-[2px] w-6',
+                    i === pipeline.length - 1 ? 'bg-accent' : 'bg-line-strong',
+                  ]}
+                />
+                <h3 class="mt-3.5 text-[0.9375rem] font-semibold text-ink">{step.stage}</h3>
+                <p class="mt-1 text-[13.5px] leading-relaxed text-pretty text-ink-muted">
+                  {step.body}
+                </p>
+              </li>
+            ))
+          }
+        </ol>
+
+        <dl class="mt-8 flex flex-wrap items-baseline gap-x-10 gap-y-3">
+          {
+            metrics.map((metric) => (
+              <div class="flex items-baseline gap-2">
+                <dd class="font-mono text-xl font-semibold tracking-[-0.02em] text-ink">
+                  {metric.value}
+                </dd>
+                <dt class="label-mono">{metric.label}</dt>
+              </div>
+            ))
+          }
+        </dl>
+      </div>
+    </section>
+
+    <!-- ============ 能力：非等分 bento ============ -->
+    <section class="border-b border-line py-16 sm:py-20">
+      <div class="mx-auto max-w-[78rem] px-5 sm:px-8">
+        <h2
+          class="text-[length:var(--text-title)] leading-tight font-semibold tracking-[-0.022em] text-balance text-ink"
+        >
+          它替你做了什么
+        </h2>
+
+        <div class="mt-10 grid gap-4 lg:grid-cols-6">
+          <!-- A：大图块 -->
+          <div class="relative min-h-[19rem] overflow-hidden rounded-[6px] bg-canvas lg:col-span-4 lg:row-span-2">
+            <Image
+              src={surface}
+              alt=""
+              width={1280}
+              height={1024}
+              class="absolute inset-0 size-full object-cover"
+            />
+            <div
+              class="absolute inset-0 bg-gradient-to-r from-[#0b0c0e] from-30% via-[#0b0c0e]/55 to-transparent"
+              aria-hidden="true"
+            >
+            </div>
+            <div
+              class="absolute inset-0 bg-gradient-to-t from-[#0b0c0e] via-[#0b0c0e]/30 to-transparent"
+              aria-hidden="true"
+            >
+            </div>
+            <div class="relative flex h-full flex-col justify-end p-6 sm:p-8">
+              <h3 class="text-xl font-semibold tracking-[-0.015em] text-[#f4f4f5]">
+                真正的 GPU 渲染
+              </h3>
+              <p class="mt-2 max-w-[38ch] text-[14.5px] leading-relaxed text-pretty text-[#aeb3ba]">
+                组件树直接变成 GPUI 元素，由 Metal、DirectX 或 Vulkan 提交到屏幕。裁剪、合成、
+                文本光栅化都在原生侧，DOM 一次都不参与。
+              </p>
+              <p class="label-mono mt-4">
+                <a
+                  href="/docs/architecture"
+                  class="inline-flex items-center gap-1.5 text-[#f58a4b] transition-opacity hover:opacity-80"
+                >
+                  读架构说明
+                  <Icon name="ph:caret-right-bold" class="size-3.5" aria-hidden="true" />
+                </a>
+              </p>
+            </div>
+          </div>
+
+          <!-- B -->
+          <div class="rounded-[6px] border border-line bg-canvas-subtle p-6 lg:col-span-2">
+            <h3 class="text-[0.9375rem] font-semibold text-ink">原生动画</h3>
+            <p class="mt-2 text-[14px] leading-relaxed text-pretty text-ink-muted">
+              React 只发一次目标值，Rust 计算中间帧并自己请求刷新。每一帧都不触发一次 React
+              渲染，也不走 N-API。
+            </p>
+          </div>
+
+          <!-- C -->
+          <div class="rounded-[6px] border border-line bg-canvas-subtle p-6 lg:col-span-2">
+            <h3 class="text-[0.9375rem] font-semibold text-ink">React 与 Solid 皆可</h3>
+            <p class="mt-2 text-[14px] leading-relaxed text-pretty text-ink-muted">
+              两套运行时，同一套元素协议。
+            </p>
+            <ul class="mt-4 space-y-1.5">
+              {
+                ['@gpuix/react', '@gpuix/solid'].map((pkg) => (
+                  <li class="font-mono text-[12.5px] text-accent">{pkg}</li>
+                ))
+              }
+            </ul>
+          </div>
+
+          <!-- D -->
+          <div class="rounded-[6px] border border-line bg-canvas-subtle p-6 lg:col-span-3">
+            <h3 class="text-[0.9375rem] font-semibold text-ink">虚拟列表</h3>
+            <p class="mt-2 text-[14px] leading-relaxed text-pretty text-ink-muted">
+              React 与 Rust 保留全部行，GPUI 只构建靠近视口的那几行。行高可以各不相同，你不必先声明。
+            </p>
+            <div class="mt-5 flex items-center gap-2" role="img" aria-label="只有视口内的两行被真正构建">
+              <span class="flex-1 space-y-1">
+                <span class="block h-1.5 rounded-[2px] border border-line"></span>
+                <span class="block h-1.5 rounded-[2px] border border-line"></span>
+              </span>
+              <span class="flex-1 space-y-1">
+                <span class="block h-1.5 rounded-[2px] bg-accent"></span>
+                <span class="block h-1.5 rounded-[2px] bg-accent"></span>
+              </span>
+              <span class="flex-1 space-y-1">
+                <span class="block h-1.5 rounded-[2px] border border-line"></span>
+                <span class="block h-1.5 rounded-[2px] border border-line"></span>
+              </span>
+            </div>
+            <p class="label-mono mt-2">实心 = 视口内，真正被构建并绘制的行</p>
+          </div>
+
+          <!-- E -->
+          <div class="rounded-[6px] border border-line bg-canvas-subtle p-6 lg:col-span-3">
+            <h3 class="text-[0.9375rem] font-semibold text-ink">可选中的原生文本</h3>
+            <p class="mt-2 text-[14px] leading-relaxed text-pretty text-ink-muted">
+              文本由 GPUI 排版，因此可以跨元素选中、复制，带语法高亮，也能做搜索高亮。
+            </p>
+            <div class="code-frame mt-4">
+              <Code
+                code={`<markdown>{doc}</markdown>
+<code lang="rust">{src}</code>
+<diff patch={patch} />`}
+                lang="tsx"
+                class="overflow-x-auto px-3.5 py-3 text-[12.5px]"
+              />
+            </div>
+          </div>
+
+          <!-- F -->
+          <div class="rounded-[6px] border border-line bg-canvas-subtle p-6 lg:col-span-6">
+            <div class="grid gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-center">
+              <div>
+                <h3 class="text-[0.9375rem] font-semibold text-ink">像 Playwright 一样测试</h3>
+                <p class="mt-2 text-[14px] leading-relaxed text-pretty text-ink-muted">
+                  用 testId 标记元素再驱动它们。鼠标走真实的 GPUI 输入路径，截图读取的是 GPU
+                  表面，不是 DOM 快照。
+                </p>
+              </div>
+              <div class="code-frame">
+                <Code
+                  code={`const button = await driver.query({ testId: 'increment' })
+await button.click()
+expect(await driver.screenshot()).toMatchFile('counter.png')`}
+                  lang="ts"
+                  class="overflow-x-auto px-3.5 py-3 text-[12.5px]"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 安装：动词轨 ============ -->
+    <section class="border-b border-line py-16 sm:py-20">
+      <div class="mx-auto grid max-w-[78rem] gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-20">
+        <div>
+          <h2
+            class="text-[length:var(--text-title)] leading-tight font-semibold tracking-[-0.022em] text-balance text-ink"
+          >
+            三条命令，一个窗口
+          </h2>
+          <p class="mt-3 text-pretty leading-relaxed text-ink-muted">
+            无需克隆仓库，无需原生构建，也不需要装 Rust 工具链。
+          </p>
+
+          <ol class="mt-8">
+            {
+              installSteps.map((step) => (
+                <li class="grid grid-cols-[3.5rem_minmax(0,1fr)] items-baseline gap-3 border-t border-line py-4">
+                  <span class="label-mono">{step.verb}</span>
+                  <code class="overflow-x-auto font-mono text-[13.5px] whitespace-nowrap text-ink"
+                    >{step.cmd}</code
+                  >
+                  <span class="col-start-2 text-[13px] text-ink-muted">{step.note}</span>
+                </li>
+              ))
+            }
+          </ol>
+        </div>
+
+        <div class="relative self-start rounded-r-[5px] bg-canvas-subtle py-5 pr-5 pl-6">
+          <span aria-hidden="true" class="absolute inset-y-0 left-0 w-[2px] rounded-full bg-accent">
+          </span>
+          <div class="flex gap-2.5">
+            <Icon name="ph:seal-check-fill" class="mt-[0.2rem] size-4 shrink-0 text-accent" aria-hidden="true" />
+            <div class="min-w-0">
+              <p class="mb-1 text-[12px] font-semibold text-accent">最容易踩的坑</p>
+              <p class="text-[14.5px] leading-relaxed text-pretty text-ink-soft">
+                给每一处 <code class="rounded-[4px] border border-line bg-surface px-1.5 py-0.5 font-mono text-[0.85em]">&lt;text&gt;</code>
+                都设置 color。GPUI 不从父元素继承 color，没有颜色的文本会被画成黑色，在深色表面上直接消失。
+              </p>
+              <a
+                href="/docs/elements"
+                class="mt-3 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-accent transition-opacity hover:opacity-80"
+              >
+                查看全部宿主元素
+                <Icon name="ph:caret-right-bold" class="size-3.5" aria-hidden="true" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 文档索引：目录页 ============ -->
+    <section class="py-16 sm:py-20">
+      <div class="mx-auto max-w-[78rem] px-5 sm:px-8">
+        <div class="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+          <h2
+            class="text-[length:var(--text-title)] leading-tight font-semibold tracking-[-0.022em] text-balance text-ink"
+          >
+            全部文档
+          </h2>
+          <p class="label-mono">
+            {docsNav.reduce((n, group) => n + group.items.length, 0)} 篇 · 按
+            {docsNav.length} 组组织 · 按 <kbd class="rounded-[4px] border border-line bg-surface px-1.5 py-0.5">⌘K</kbd>
+            搜任何 API 名称
+          </p>
+        </div>
+
+        <div class="mt-10 columns-1 gap-x-14 sm:columns-2 lg:columns-4">
+          {
+            docsNav.map((group) => (
+              <div class="mb-9 break-inside-avoid">
+                <h3 class="label-mono mb-2.5">{group.title}</h3>
+                <ul>
+                  {group.items.map((item) => (
+                    <li>
+                      <a
+                        href={item.href}
+                        class="group flex items-baseline gap-2 py-[5px] text-[13.5px] text-ink-muted transition-colors hover:text-ink"
+                      >
+                        <span class="flex-1">{item.title}</span>
+                        <Icon
+                          name="ph:arrow-right"
+                          class="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          aria-hidden="true"
+                        />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-line">
+    <div
+      class="mx-auto flex max-w-[78rem] flex-col gap-4 px-5 py-10 text-sm text-ink-faint sm:flex-row sm:items-center sm:justify-between sm:px-8"
+    >
+      <p>
+        内容整理自 GPUIX 官方 README ·
+        <a
+          href="https://github.com/remorses/gpuix/blob/main/LICENSE"
+          target="_blank"
+          rel="noreferrer noopener"
+          class="ml-1 text-ink-muted underline decoration-line underline-offset-4 transition-colors hover:text-accent"
+          >Apache-2.0</a
+        >
+      </p>
+      <p class="flex items-center gap-5">
+        <a href="/docs/quick-start" class="transition-colors hover:text-ink">快速开始</a>
+        <a href="/docs/roadmap" class="transition-colors hover:text-ink">实现状态</a>
+        <a
+          href={GITHUB}
+          target="_blank"
+          rel="noreferrer noopener"
+          class="transition-colors hover:text-ink"
+          >GitHub</a
+        >
+      </p>
+    </div>
+  </footer>
+
+  <CodeEnhance />
+</Base>

@@ -1,0 +1,70 @@
+---
+title: 窗口控制与文件选择器
+description: 桌面渲染器暴露了 GPUI 原生的最小化、缩放与全屏操作，以及操作系统的文件选择器。
+eyebrow: 窗口与渲染器
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+## 窗口控制
+
+桌面渲染器暴露了 GPUI 原生的最小化、缩放与全屏操作。可通过 `useGpuixRequired()` 或 `createRenderer()` 返回的 renderer 来访问它们。
+
+```tsx
+function WindowControls() {
+  const renderer = useGpuixRequired()
+  return (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <div onClick={() => renderer.minimizeWindow?.()}>Minimize</div>
+      <div onClick={() => renderer.zoomWindow?.()}>Zoom</div>
+      <div onClick={() => renderer.toggleFullscreen?.()}>Fullscreen</div>
+    </div>
+  )
+}
+```
+
+`minimizeWindow()`、`zoomWindow()` 与 `toggleFullscreen()` 在 macOS、Windows、Linux 和 FreeBSD 上均可使用。`zoomWindow()` 使用的是平台原生的缩放或最大化操作。这些方法在浏览器渲染器中不可用。
+
+## 文件选择器
+
+`promptForPaths()` 会打开操作系统的文件选择器。它解析为所选的绝对路径，若用户取消则返回 `null`。
+
+```tsx
+import { useGpuixRequired } from '@gpuix/react'
+
+function AttachFiles() {
+  const renderer = useGpuixRequired()
+
+  const attach = async () => {
+    const paths = await renderer.promptForPaths?.({
+      files: true,
+      multiple: true,
+      prompt: 'Attach',
+    })
+    if (paths) console.log(paths)
+  }
+
+  return <div onClick={attach}>Attach files</div>
+}
+```
+
+不带任何选项时，选择器会选择一个文件。设置 `directories: true` 则可改为选择目录。macOS 可以在一次提示里同时选择文件与目录；Windows 与 Linux 则要求每次提示只选一种。无效的选项以及平台选择器失败都会 reject。浏览器端的方法会 reject，因为浏览器返回的是 `File` 对象，而非操作系统路径。一个被注入的自定义 renderer 可以省略这一可选能力。
+
+<Callout type="note">
+  在当前的 Windows GPUI 后端上，系统对话框无法区分取消与其他 `IFileDialog::Show` 错误，因此两者都会解析为 `null`。这需要在 GPUI 中修复，GPUIX 才能上报那些错误。
+</Callout>
+
+## 激活窗口
+
+`activateWindow()` 会把窗口提到最前并让它获得焦点。这是显示 `show: false` 窗口的唯一方式。可在任意组件里通过 `useGpuixRequired()` 获取它：
+
+```tsx
+import { useGpuixRequired } from '@gpuix/react'
+
+function Reveal() {
+  const renderer = useGpuixRequired()
+  return <div onClick={() => renderer.activateWindow?.()}>Show</div>
+}
+```
+
+在 React 之外，可以在 `createRenderer()` 返回的 renderer 上调用它。更多背景见[后台启动与 agent 驱动](/docs/background)。

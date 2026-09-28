@@ -1,0 +1,89 @@
+---
+title: 支持的事件
+description: '全部事件属性与载荷字段、指针捕获的触发规则，以及滚轮不冒泡这一点。'
+eyebrow: 参考
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+| 事件 | 属性 | 载荷字段 |
+|---|---|---|
+| 点击 | `onClick` | `x`, `y`, `button`, `clickCount`, `isRightClick`, `modifiers` — 仅主键 |
+| 辅助点击 | `onAuxClick` | `x`, `y`, `clickCount`, `isRightClick`, `modifiers` — 非主键 |
+| 鼠标按下 | `onMouseDown` | `x`, `y`, `button`, `clickCount`, `modifiers` |
+| 鼠标抬起 | `onMouseUp` | `x`, `y`, `button`, `clickCount`, `modifiers` |
+| 鼠标进入 | `onMouseEnter` | `hovered` |
+| 鼠标离开 | `onMouseLeave` | `hovered` |
+| 鼠标移动 | `onMouseMove` | `x`, `y`, `pressedButton`, `modifiers` |
+| 外侧点击 | `onMouseDownOutside` | `x`, `y`, `button`, `modifiers` |
+| 按键按下 | `onKeyDown` | `key`, `keyChar`, `isHeld`, `modifiers` |
+| 按键抬起 | `onKeyUp` | `key`, `keyChar`, `modifiers` |
+| 获得焦点 | `onFocus` | — |
+| 失去焦点 | `onBlur` | — |
+| 滚动 | `onScroll` | `deltaX`, `deltaY`, `precise`, `touchPhase`, `modifiers` |
+| 文件拖入 | `onFileDrop` | `paths`, `x`, `y` — 来自 Finder 或系统的 Unicode 文件系统路径 |
+| 变更 | `onChange` | `value` — 仅 `<input>` 与 `<textarea>` |
+| 提交 | `onSubmit` | `value` — `<input>` 始终触发，`<textarea>` 在设置了 `onSubmit` 时触发 |
+| 切换文件 | `onToggleFile` | `value`（文件路径）— 仅 `<diff>` |
+| 展开更多 | `onShowMore` | `value`（隐藏行数）— 仅 `<diff>` |
+| 行点击 | `onLineClick` | `value`, `oldLine`, `newLine` — 仅 `<diff>` |
+| 链接点击 | `onLinkClick` | `value`（URL）— 仅 `<markdown>` |
+| 选区变更 | `onSelectionChange` | `value`（拼接后的选中文本）— `render()` 上的窗口级事件 |
+
+键盘与焦点监听器会自动创建一个持久的 GPUI `FocusHandle`。仅加监听器并不会把 `div` 放进 Tab 顺序；为此要加上 `tabIndex={0}`。输入框与多行文本框已经使用 tab index `0`。
+
+## 监听器可以放在哪里
+
+把监听器放在 `div`、`text`、`img`、`svg`、`input`、`textarea`、`code`、`markdown`、`diff` 或 `anchored` 上。
+
+`<virtual-list>` 不接受该事件，请把它包起来：
+
+```tsx
+<div
+  onFileDrop={(event) => openFiles(event.paths ?? [])}
+  style={{ width: 400, height: 300 }}
+>
+  <virtual-list estimatedItemHeight={24}>{rows}</virtual-list>
+</div>
+```
+
+## 文件拖放
+
+来自 Finder 或系统的文件拖放会落在注册了 `onFileDrop` 的悬停元素上。`paths` 是绝对 Unicode 文件系统路径的数组。`x` 和 `y` 是窗口像素坐标系下的拖放落点。空拖放，或拖放中包含非 Unicode 路径时，不会触发。
+
+## 指针捕获
+
+同时监听 `onMouseDown` 和 `onMouseMove` 的节点会**捕获指针**，类似 HTML 的 [`setPointerCapture`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setPointerCapture)。在指针离开命中区、离开父级、离开窗口之后，`onMouseMove` 和 `onMouseUp` 仍会继续触发。只有 `onMouseDown` / `onMouseUp` 的节点不会捕获，所以在外部松开时点击依然会结束。
+
+捕获由**按下动作本身**触发，所以请把三个监听器都放在用户抓取的那个元素上：
+
+```tsx
+<div
+  style={{ cursor: 'grab', active: { cursor: 'grabbing' } }}
+  onMouseDown={(e) => beginDrag(e)}
+  onMouseMove={(e) => moveDrag(e)}
+  onMouseUp={endDrag}
+/>
+```
+
+<Callout type="warning">
+  按下时挂载的全窗口遮罩无法替代这一点。按下发生时遮罩还不存在，所以它永远无法触发捕获，越过窗口边缘的松开动作就会丢失。手势进行中只有被按下的元素会收到移动事件，其余情况下只有悬停元素会收到，因此代价是每次指针移动一个事件。
+</Callout>
+
+捕获仅在**左**键按下时触发。右键拖拽不会被捕获，因此指针离开元素时就会结束。
+
+`onClick` 在左键松开时触发。其它按键请用 `onAuxClick` 并读取 `event.isRightClick`。`onMouseDown` 与 `onMouseUp` 通过 `event.button`（`0` 左键、`1` 中键、`2` 右键）能看到每一个按键。
+
+## 滚轮不冒泡
+
+<Callout type="important">
+  The wheel does not bubble the way DOM events do. GPUI hit-tests one flat list of painted boxes, so the wheel reaches **any** scroller behind the element, not only an ancestor. An absolute card floating over an unrelated scroll pane will scroll that pane. Give a real overlay `pointerEvents: "auto"`.
+</Callout>
+
+对应的中文要点：一个浮在无关滚动面板上方的绝对定位卡片会滚动那个面板。给真正的遮罩元素设置 `pointerEvents: "auto"`，让它连滚轮也一起吞掉。`<anchored>` 默认就会遮挡，并有独立的 `occlude` prop，因此菜单与 tooltip 两者都不需要。
+
+<Callout type="note">
+  `pointerEvents: "none"` 意味着该元素**不插入命中盒**，所以它不会挡住身后的任何东西。它并不会禁用同一元素上的监听器，也不会被继承，因此子元素仍保留自己的命中盒。
+</Callout>
+
+一个填充了内容、位于点击目标内部的子元素（开关滑块、单选点、勾选图标）需要 `pointerEvents: "none"`，否则它会吃掉父元素的点击。对于 Select 与 Combobox 的行，请改用 item 原语的 `asChild` prop。详见[无样式控件](/docs/headless-controls)。

@@ -1,0 +1,52 @@
+---
+title: 热重载
+description: bun --hot 下保存会重新运行入口，render() 在同一个窗口上重新挂载 React。
+eyebrow: 窗口与渲染器
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+## 1. 文件以 render() 结尾
+
+```tsx
+import { render } from '@gpuix/react'
+
+function App() {
+  return <div style={{ padding: 16 }}>hello</div>
+}
+
+render(<App />, { title: 'My App', width: 800, height: 600 })
+```
+
+不要在此文件中调用 `createRenderer()` 或 `init()`。`bun --hot` 在保存时会重新运行整个入口。第二次 `init()` 会打开第二个窗口。
+
+## 2. 用 bun --hot 启动应用
+
+优先使用 **`bun --hot`**，而非普通的 `bun` 或 `tsx` 运行。没有 `--hot` 时，一次保存会启动第二个进程。有了它，`render()` 会在同一个窗口上重新挂载 React。
+
+```bash
+bun --hot app.tsx
+```
+
+## 3. 保存文件
+
+```text
+save .tsx  ►  bun re-evaluates the entry  ►  render() remounts React
+                     │
+                     ▼
+              GpuixRenderer, window, GPU stay
+```
+
+第一次 `render()` 会创建原生宿主并将其存储在 `globalThis` 上。每次保存都会卸载 React 树，并在同一个宿主上挂载一棵新的。
+
+**保持不变：** 窗口、GPU 设备、原生 `.node` 插件、GPUI 的滚动物理。
+
+**会被重置：** `useState`、焦点、React 事件处理器。
+
+<Callout type="note">
+  这是一次**重新挂载**，而非 React Refresh。要保留 hook 状态，需要 Bun 在 `--hot` 期间注入 `$RefreshReg$`。该 transform 仅存在于 `bun build --react-fast-refresh`。相关追踪见 [oven-sh/bun#40179](https://github.com/oven-sh/bun/issues/40179)。
+</Callout>
+
+原生的 `.node` 改动仍然需要重新构建。参见[开发 Rust 侧](/docs/developing-rust)。
+
+浏览器 Web 示例的热重载路径不同：它走的是 React Fast Refresh，会保留 `useState`。见[示例](/docs/examples#浏览器中的热重载)。

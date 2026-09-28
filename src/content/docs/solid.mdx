@@ -1,0 +1,90 @@
+---
+title: Solid 快速开始
+description: 用 Solid 1 的保留 JSX 与 @gpuix/solid 官方 adapter 编写 GPUIX 应用，无需包装命令或 Vite 配置。
+eyebrow: 框架
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+安装 Solid 以及官方的 Solid adapter：
+
+```bash
+bun add --exact @gpuix/solid @gpuix/native solid-js
+```
+
+## 使用 Solid 保留的 JSX
+
+preload 会为 Solid 的通用渲染器编译应用的 `.tsx` 与 `.jsx` 文件，并选择响应式的客户端运行时。
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "preserve",
+    "jsxImportSource": "@gpuix/solid",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  }
+}
+```
+
+```toml
+preload = ["@gpuix/solid/preload"]
+```
+
+```tsx
+import { createSignal } from 'solid-js'
+import { render } from '@gpuix/solid'
+
+function App() {
+  const [count, setCount] = createSignal(0)
+  return (
+    <div style={{ padding: 24, backgroundColor: '#1a1a1a', height: '100%' }}>
+      <div onClick={() => setCount((value) => value + 1)}>
+        <text style={{ color: '#e2e2e2' }}>Count: {count()}</text>
+      </div>
+    </div>
+  )
+}
+
+render(() => <App />, { title: 'Solid GPUIX', width: 800, height: 600 })
+```
+
+直接运行即可。无需包装命令，也无需 Vite 配置。
+
+```bash
+bun app.tsx
+bun --hot app.tsx
+```
+
+<Callout type="important">
+  注意 `jsx` 是 `"preserve"` 而不是 `"react-jsx"`，并且 `jsxImportSource` 指向 `@gpuix/solid`。
+</Callout>
+
+## 生产构建
+
+对于生产环境的 `Bun.build`，传入导出的插件：
+
+```ts
+import solidPlugin from '@gpuix/solid/bun-plugin'
+
+await Bun.build({
+  entrypoints: ['./app.tsx'],
+  target: 'bun',
+  outdir: './dist',
+  plugins: [solidPlugin],
+})
+```
+
+## 版本范围
+
+`@gpuix/solid` 面向稳定的 Solid 1.9。其 peer 版本区间为 `>=1.9 <2`。
+
+完整的 Solid adapter API 见 [Solid 指南](https://github.com/remorses/gpuix/blob/main/website/src/guides/solid.mdx)。
+
+## 两个框架共享什么
+
+React 与 Solid 共用同一套 ID、mutation 队列、事件路由、测试 API、自动化客户端、观察者以及文本搜索匹配器。它们各自框架相关的调度器与组件上下文则保留在各自的 adapter 包中。详见[架构](/docs/architecture)与[支持的元素](/docs/elements)。

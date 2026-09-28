@@ -1,0 +1,54 @@
+---
+import type { GetStaticPaths } from 'astro'
+import { getCollection, render } from 'astro:content'
+import Docs from '../../layouts/Docs.astro'
+import Callout from '../../components/mdx/Callout.astro'
+import Feature from '../../components/mdx/Feature.astro'
+import { flatNav, docsNav, type NavItem } from '../../lib/nav'
+
+export const getStaticPaths = (async () => {
+  const docs = await getCollection('docs')
+
+  return docs.map((entry) => {
+    const href = `/docs/${entry.id}`
+
+    // 显式声明优先，否则按 nav.ts 的登记顺序推导上一篇 / 下一篇
+    let index = flatNav.findIndex((item) => item.href === href)
+    if (index === -1) {
+      const group = docsNav.find((g) => g.items.some((i) => i.href === href))
+      if (group) {
+        const within = group.items.findIndex((i) => i.href === href)
+        const globalIndex = flatNav.findIndex((i) => i.href === href)
+        index = globalIndex === -1 ? within : globalIndex
+      }
+    }
+
+    const fallbackPrev: NavItem | undefined = index > 0 ? flatNav[index - 1] : undefined
+    const fallbackNext: NavItem | undefined =
+      index >= 0 && index < flatNav.length - 1 ? flatNav[index + 1] : undefined
+
+    return {
+      params: { slug: entry.id },
+      props: {
+        entry,
+        prev: entry.data.prev ?? fallbackPrev,
+        next: entry.data.next ?? fallbackNext,
+      },
+    }
+  })
+}) satisfies GetStaticPaths
+
+const { entry, prev, next } = Astro.props
+const { Content, headings } = await render(entry)
+---
+
+<Docs
+  title={entry.data.heading ?? entry.data.title}
+  description={entry.data.description}
+  headings={headings}
+  eyebrow={entry.data.eyebrow}
+  prev={prev}
+  next={next}
+>
+  <Content components={{ Callout, Feature }} />
+</Docs>

@@ -1,0 +1,79 @@
+---
+import '../styles/global.css'
+
+interface Props {
+  title: string
+  description: string
+  /** 社交预览图，docs 页面用默认站内图 */
+  ogImage?: string
+}
+
+const { title, description, ogImage = '/og-default.png' } = Astro.props
+
+const canonical = new URL(Astro.url.pathname.replace(/\/$/, '') || '/', Astro.site)
+const socialImage = new URL(ogImage, Astro.site)
+---
+
+<!doctype html>
+<html lang="zh-CN" class="scroll-smooth">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonical} />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="theme-color" content="#0b0c0e" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="GPUIX 中文文档" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={socialImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="GPUIX：用 React 或 Solid 编写 GPU 原生桌面界面" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImage} />
+
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="GPUIX 中文文档"
+      href={new URL('rss.xml', Astro.site)}
+    />
+
+    <script is:inline>
+      // 在首次绘制前套用主题，避免深色模式下的白屏闪烁。
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('gpuix-theme')
+          var dark = stored
+            ? stored === 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches
+          document.documentElement.classList.toggle('dark', dark)
+        } catch (e) {
+          /* 隐私模式下 localStorage 可能抛错，忽略即可 */
+        }
+      })()
+    </script>
+
+    <slot name="head" />
+  </head>
+  <body class="min-h-dvh bg-canvas text-ink antialiased">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-accent-ink"
+    >
+      跳到主要内容
+    </a>
+    <slot />
+  </body>
+</html>

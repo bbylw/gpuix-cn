@@ -1,0 +1,98 @@
+---
+import type { MarkdownHeading } from 'astro'
+
+interface Props {
+  headings: MarkdownHeading[]
+}
+
+const { headings } = Astro.props
+
+// 只展示 h2 / h3，h4 以下会让目录过长
+const items = headings.filter((h) => h.depth === 2 || h.depth === 3)
+---
+
+{
+  items.length > 0 && (
+    <nav aria-label="本页目录" class="text-[13px]">
+      <h2 class="label-mono mb-2.5 pl-3.5">本页内容</h2>
+      <ul class="border-l border-line" data-toc>
+        {items.map((heading) => (
+          <li>
+            <a
+              href={`#${heading.slug}`}
+              data-toc-link={heading.slug}
+              class:list={[
+                'block border-l-2 py-[5px] leading-snug transition-colors -ml-px',
+                heading.depth === 3 ? 'pl-7' : 'pl-3.5',
+                'border-transparent text-ink-muted hover:border-line-strong hover:text-ink',
+                'aria-[current=true]:border-accent aria-[current=true]:text-ink aria-[current=true]:font-medium',
+              ]}
+            >
+              {heading.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
+
+<script>
+  function markActive(links: Map<string, HTMLAnchorElement>) {
+    const offset = window.scrollY + 120
+    let current: string | null = null
+    for (const slug of links.keys()) {
+      const el = document.getElementById(slug)
+      if (!el) continue
+      if (el.getBoundingClientRect().top + window.scrollY <= offset) current = slug
+      else break
+    }
+    for (const [slug, link] of links) {
+      if (slug === current) link.setAttribute('aria-current', 'true')
+      else link.removeAttribute('aria-current')
+    }
+  }
+
+  function initToc() {
+    const links = new Map(
+      [...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')].map((a) => [
+        a.dataset.tocLink!,
+        a,
+      ]),
+    )
+    if (links.size === 0) return
+
+    const headings = [...links.keys()]
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => el !== null)
+
+    const visible = new Set<string>()
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) visible.add(entry.target.id)
+          else visible.delete(entry.target.id)
+        }
+        if (visible.size > 0) {
+          const first = headings.find((h) => visible.has(h.id))
+          if (first) {
+            for (const [slug, link] of links) {
+              if (slug === first.id) link.setAttribute('aria-current', 'true')
+              else link.removeAttribute('aria-current')
+            }
+            return
+          }
+        }
+        markActive(links)
+      },
+      { rootMargin: '-72px 0px -70% 0px', threshold: [0, 1] },
+    )
+
+    headings.forEach((h) => observer.observe(h))
+    markActive(links)
+  }
+
+  initToc()
+  document.addEventListener('astro:page-load', initToc)
+</script>

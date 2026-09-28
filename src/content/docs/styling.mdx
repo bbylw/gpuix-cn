@@ -1,0 +1,242 @@
+---
+title: 支持的样式
+description: '完整属性清单、颜色文法、渐变与阴影写法，以及 hover / active / focusVisible 的原生行为。'
+eyebrow: 参考
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+通过 `style` 属性做类 CSS 的样式设置：
+
+```tsx
+<div style={{
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  padding: 16,
+  backgroundColor: '#3b82f6',
+  borderRadius: 8,
+}}>
+  <div style={{ color: '#ffffff', fontSize: 18 }}>
+    Hello GPUI!
+  </div>
+</div>
+```
+
+<Callout type="important" title="GPUIX 的样式看起来像 CSS，但不是 CSS">
+  几个差异会在第一个项目里绊倒所有人：
+
+  - **`div` 是块级，不是 flex。** 在使用 `flexDirection`、`gap`、`alignItems` 或 `alignSelf` 之前要先设 `display: "flex"`。不设的话这些属性会被静默忽略。
+  - **需要收缩的 flex 子项需要 `minWidth: 0`。** 规则和 CSS 一致，但因为没有浏览器 DevTools 可检查而更容易遗漏。
+  - **没有简写值。** `padding`、`margin` 和 `border` 只接受数字。像 `"0 16px"`、`"1px solid #fff"` 或 `calc()` 这类 CSS 字符串会被忽略。
+  - **`boxShadow` 是结构化对象**，不是 CSS 字符串。见下文。
+  - **没有 `<button>`。** 用 `<div onClick>` 配合 `cursor: "pointer"`，或使用 `Button` 原语。
+  - **不要把 `<text>` 嵌套进 `<text>`。** 相邻的 `<text>` 兄弟会合并成一行。另一个 `<text>` 内的 `<text>` 子项是一个嵌套 div。
+  - **`<input>` 没有默认内边距。** 在 input 的样式上设 `padding`，或在父包裹层上留白。input 会自动按其自身的 `borderRadius` 裁剪。
+</Callout>
+
+## 属性总览
+
+**布局：** `display`（`"flex"` | `"grid"`）、`flexDirection`、`flexWrap`、`flexGrow`、`flexShrink`、`flexBasis`、`alignItems`、`alignSelf`、`alignContent`、`justifyContent`、`gap`、`rowGap`、`columnGap`、`gridTemplateColumns`、`gridTemplateRows`、`gridColumnMin`、`gridRowMin`
+
+**尺寸：** `width`、`height`、`minWidth`、`minHeight`、`maxWidth`、`maxHeight` — 接受像素（数字）或百分比（如 `"100%"` 这样的字符串）
+
+**间距：** `padding`、`paddingTop/Right/Bottom/Left`、`margin`、`marginTop/Right/Bottom/Left`
+
+**定位：** `position`（`"relative"` | `"absolute"` | `"fixed"`）、`top`、`right`、`bottom`、`left` — `"fixed"` 的布局方式同 `"absolute"`，因为 GPUI 没有可固定其上的滚动文档
+
+**视觉：** `background`、`backgroundColor`、`color`、`opacity`、`cursor`、`pointerEvents`、`borderRadius`、`borderTopLeftRadius`、`borderTopRightRadius`、`borderBottomLeftRadius`、`borderBottomRightRadius`、`borderWidth`、`borderTopWidth`、`borderRightWidth`、`borderBottomWidth`、`borderLeftWidth`、`borderColor`、`boxShadow`、`outlineWidth`、`outlineColor`、`outlineOffset`
+
+**溢出：** `overflow`、`overflowX`、`overflowY` — `"hidden"` 裁剪内容，`"scroll"` 创建一个带有持久滚动状态的原生可滚动容器
+
+**文本：** `fontSize`、`fontFamily`、`fontWeight`、`textAlign`、`lineHeight`、`whiteSpace`、`textOverflow`、`lineClamp`、`textDecoration`（`"underline"` | `"line-through"` | `"none"`）
+
+**选区：** `userSelect`（`"text"` | `"none"`）、`selectionColor` — 两者都会沿树向下继承
+
+**焦点：** `focusVisible`
+
+## 光标
+
+`cursor` 接受 CSS 关键字。未列出的关键字会被忽略，就像其它无效的样式值一样。
+
+| 分组 | 关键字 |
+|---|---|
+| 指向 | `default`、`auto`、`pointer`、`context-menu`、`not-allowed`、`no-drop` |
+| 文本 | `text`、`vertical-text`、`crosshair` |
+| 拖拽 | `grab`、`grabbing`、`move`、`all-scroll`、`alias`、`copy` |
+| 缩放 | `col-resize`、`row-resize`、`ew-resize`、`ns-resize`、`nwse-resize`、`nesw-resize`、`n-resize`、`e-resize`、`s-resize`、`w-resize`、`ne-resize`、`nw-resize`、`se-resize`、`sw-resize` |
+
+```tsx
+<div style={{ cursor: 'grab', active: { cursor: 'grabbing' } }} />
+<div style={{ cursor: 'col-resize' }} />
+```
+
+## 颜色
+
+所有带颜色的样式字段都接受同一套字符串文法。GPUIX 原生使用 `csscolorparser` 0.8.3，接受：
+
+- 具名颜色与 `transparent`；
+- 3/4/6/8 位十六进制，带不带 `#` 均可；
+- `rgb()` / `rgba()`、`hsl()` / `hsla()`、`hwb()` / `hwba()`，以及 `hsv()` / `hsva()`；
+- `lab()`、`lch()`、`oklab()`，以及 `oklch()`；
+- `none` 分量，以及解析器有限的相对颜色 `from` / `calc()` 形式。
+
+标准逗号写法与现代空格/斜杠 alpha 写法都可用。GPUI 绘制前会把值转换为硬裁剪的 sRGB。无效字符串只会被该属性忽略，不会拒绝整个样式对象。
+
+### 线性渐变
+
+`background` 接受 GPUI 原生的**两色标线性渐变**。角度遵循 CSS 规则：`0` 指向上方，数值顺时针增大。色标位置用 `0` 到 `1`。
+
+```tsx
+<div
+  style={{
+    background: {
+      type: 'linear-gradient',
+      angle: 90,
+      stops: [
+        { color: '#7c3aed', position: 0 },
+        { color: '#06b6d4', position: 1 },
+      ],
+      colorSpace: 'oklab',
+    },
+    borderRadius: 12,
+  }}
+/>
+```
+
+`colorSpace` 可选，默认为 `"srgb"`。GPUI 也支持 `"oklab"`。它不支持径向、锥形、重复渐变，也不支持超过两个色标的渐变。
+
+`hsv()`、`hsva()` 与 `hwba()` 是解析器的扩展，而非 CSS Color 4 标准函数。`color()`、平台/动态颜色，以及数值形式的颜色整数均不被接受。
+
+### 现代颜色语法
+
+主题值可以使用同样的现代文法：
+
+```tsx
+const theme = {
+  surface: 'oklch(18% 0.02 260)',
+  accent: 'oklch(67.3% 0.182 276.935)',
+  text: 'oklch(96% 0 0)',
+}
+
+<div style={{ backgroundColor: theme.surface, borderColor: theme.accent }}>
+  <text style={{ color: theme.text }}>Hello GPUI!</text>
+</div>
+```
+
+有限的相对颜色形式可以从一个基准值派生出新颜色：
+
+```tsx
+<div
+  style={{
+    backgroundColor: '#bad455',
+    borderColor: 'oklch(from #bad455 calc(l - 0.15) calc(c * 0.7) h)',
+  }}
+/>
+```
+
+## 阴影
+
+`boxShadow` 接受单个结构化阴影。其字段为 `offsetX`、`offsetY`、`blurRadius`、`spreadRadius` 与 `color`：
+
+```tsx
+<div
+  style={{
+    boxShadow: {
+      offsetX: 0,
+      offsetY: 4,
+      blurRadius: 12,
+      spreadRadius: 0,
+      color: '#00000033',
+    },
+  }}
+/>
+```
+
+## 悬停与激活
+
+`hover` 与 `active` 是**嵌套的样式对象**。当指针悬停在元素上或鼠标按下时，GPUI 会以原生方式应用它们，没有 JavaScript 往返。
+
+```tsx
+<div
+  style={{
+    backgroundColor: '#313244',
+    borderRadius: 8,
+    padding: 12,
+    hover: { backgroundColor: '#45475a' },
+    active: { backgroundColor: '#585b70' },
+  }}
+>
+  Press
+</div>
+```
+
+嵌套只有一层深。`hover` 对象中不能再包含另一个 `hover` 或 `active`。
+
+它们对**所有**元素都有效，包括 `<text>`、`<code>`、`<markdown>`、`<diff>`、`<img>`、`<svg>` 以及编辑器。唯一的例外是 `<virtual-list>`，它的 `style` 类型不接受它们：gpui 的列表没有可持有悬停或按下状态的交互身份，所以请把它们放在包裹用的 `<div>` 上。
+
+## 焦点样式
+
+`focusVisible` 是一个嵌套样式对象，类似 `hover`。它在元素拥有焦点**且最后一次输入来自键盘**时应用，类似 CSS 的 `:focus-visible`。GPUI 会以原生方式应用它。
+
+鼠标按下永远不会显示它，文本字段也一样。没有单独的 `focus` 键。
+
+```tsx
+<div
+  tabIndex={0}
+  style={{
+    borderRadius: 8,
+    backgroundColor: '#313244',
+    focusVisible: { outlineWidth: 2, outlineColor: '#89b4fa', outlineOffset: 2 },
+  }}
+/>
+```
+
+它需要一个**可聚焦**的元素：`tabIndex`、某个键或焦点监听器、`<input>`、`<textarea>`，或 `Button` 之类的原语。
+
+### 默认行为：其余一切变暗
+
+GPUIX 不画任何环。当某个控件（`Button`、设置了 `tabIndex` 的 div）拥有键盘焦点时，每一个**其它**可聚焦元素都会以 40% 的不透明度渲染。被聚焦的那个保持原样，于是你能一眼看清 Tab 能到达的所有元素。
+
+```text
+Tab  ► [ 保存 ]  (新建变暗)  (搜索变暗)  (输入框变暗)
+```
+
+- 鼠标按下、拖拽，或鼠标移动超过 8px 会结束变暗。手搭在触控板上产生的更小抖动则保留。
+- 聚焦的 `<input>` 或 `<textarea>` 不会让任何元素变暗：打字同样属于键盘输入，且光标已经表明了焦点。
+- 被聚焦元素的祖先永远不会变暗，因为不透明度会覆盖整棵子树。
+- `focusVisible` 与变暗是**相互独立**的。一个从 `focusVisible` 获得环的元素，在另一个控件拥有焦点时仍会变暗。
+- `style.keyboardFocusDim: false` 会让单个元素保持完全不透明。`Select.Content` 和 `Dialog.Popup` 会设置它。
+
+```tsx
+<div tabIndex={0} style={{
+  focusVisible: { outlineWidth: 2, outlineColor: '#89b4fa' }, // 获得焦点时
+}} />                                                         // 否则变暗
+<div tabIndex={0} style={{ keyboardFocusDim: false }} />      // 永不变暗
+```
+
+**对整个窗口关闭变暗。** 向 `render()`（或 `createTestRoot()`）传入 `keyboardFocusDim: false`，然后用 `focusVisible` 自己设置焦点样式。
+
+```tsx
+render(<App />, { keyboardFocusDim: false })
+```
+
+**是描边（outline）不是边框（border）。** `outlineWidth`、`outlineColor` 与 `outlineOffset` 在边框盒外侧画线，类似 CSS 的 `outline`。它**不占布局空间**，所以用 `focusVisible` 加的环不会移动任何东西。负的 offset 会把它画在内侧。它遵循 `borderRadius`。设置了 `overflow: "hidden"` 的父级会裁剪它，就像在浏览器里一样。
+
+## 两处文本注意事项
+
+<Callout type="warning" title="white-space: pre 不受支持">
+  GPUI 的文本系统只有 `normal`（自动换行）和 `nowrap`（单行）。要像 HTML `<pre>` 那样保留换行，请在 React 里按 `\n` 切分文本，并把每一行作为独立的 `<text>` 元素渲染在一个 flex 纵向容器里：
+
+  ```tsx
+  <div style={{ display: 'flex', flexDirection: 'column', fontFamily: 'Menlo' }}>
+    {code.split('\n').map((line, i) => (
+      <text key={i} style={{ whiteSpace: 'nowrap' }}>{line}</text>
+    ))}
+  </div>
+  ```
+</Callout>
+
+<Callout type="important">
+  **GPUI 默认文本颜色是黑色而非白色。** 与 CSS 不同，GPUI 不会从父元素继承 `color`。每一个没有显式设置 `color` 样式的 `<text>` 元素都会渲染为黑色 —— 在深色背景上会不可见。请务必在你的文本元素或父级 `<div>` 上设置 `color`（父级 `<div>` 会通过 GPUI 的 `Styled` trait 把 `text_color` 应用到该子树的所有子元素）。
+</Callout>

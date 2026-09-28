@@ -1,0 +1,86 @@
+---
+title: 文本输入
+description: '平台原生编辑器能力：光标、选区、IME、剪贴板与撤销重做，以及行高与内边距的尺寸规则。'
+eyebrow: 组件
+---
+
+`<input>` 与 `<textarea>` 使用 GPUI 的平台输入处理器。它们支持原生的光标（caret）、文本选区、IME 组合、剪贴板操作、撤销/重做、字素安全的删除（grapheme-safe deletion）以及鼠标定位。
+
+```tsx
+<textarea
+  value={draft}
+  placeholder="Ask anything"
+  minRows={1}
+  maxRows={8}
+  onChange={(event) => setDraft(event.value ?? '')}
+/>
+
+<textarea
+  value={draft}
+  onChange={(event) => setDraft(event.value ?? '')}
+  onSubmit={send}
+/>
+```
+
+在 `<textarea>` 中，`Enter` 会插入一个换行。传入 **`onSubmit`** 则改为在 Enter 时触发该事件；`Shift+Enter` 仍然插入换行。`<input>` 在 Enter 时始终触发 `onSubmit`。编辑器会先在原生层更新，然后才把完整的值报告给 React。
+
+`value` 的变化可以替换原生内容，但保持相同的 prop 值并不会像浏览器托管的输入框那样拒绝一次编辑。
+
+## 光标
+
+聚焦的光标在编辑期间保持实心，空闲时每 500ms 闪烁一次。在失焦或窗口处于非活跃状态时，它会停止调度重绘帧。可以通过共享的原生主题覆盖它的颜色：
+
+```tsx
+<input theme={{ caret: '#22c55e' }} />
+```
+
+## 剪贴板
+
+当剪贴板中没有文本时，`Cmd+V` 或 `Ctrl+V` 会继续触发 `onKeyDown`，而不是消失在编辑器内部。这样应用就可以自己处理只有图片、或只有文件的剪贴板。即便操作系统把文件路径作为兜底文本一并包含，被复制的文件也仍会传播。混合了文本与图片的剪贴板内容仍然会粘贴其文本部分。
+
+## 行高
+
+`style` 中的 **`fontSize` 与 `lineHeight`** 用于设定每一行的尺寸。若不提供 `lineHeight`，行会使用 GPUI 默认的 leading，因此更大的 `fontSize` 会让盒子变高。传入 `lineHeight` 以像素为单位设定行高。`minRows` 与 `maxRows` 会按该高度做倍数放大。显式的 `height` 仍然会覆盖两者。
+
+```tsx
+<textarea
+  value={draft}
+  minRows={1}
+  maxRows={8}
+  style={{ fontSize: 14, lineHeight: 20 }}
+  onChange={(event) => setDraft(event.value ?? '')}
+/>
+```
+
+## 搜索胶囊中的输入框
+
+`<input>` **默认没有内边距**，并且会把文本绘制在盒子的顶部。当给定了额外高度时，单行输入框会将其文本垂直居中。请在输入框的 style 上或一个父级包装容器上设置 `padding`。当输入框带有 `borderRadius` 时，文本会自动裁剪为圆角形状。
+
+```tsx
+<div style={{
+  display: 'flex',
+  flexDirection: 'row',
+  alignItems: 'center',
+  height: 32,
+  paddingLeft: 10,
+  paddingRight: 4,
+  borderRadius: 16,
+  backgroundColor: '#1a1a22',
+  borderWidth: 1,
+  borderColor: '#ffffff14',
+}}>
+  <input
+    value={query}
+    onChange={(e) => setQuery(e.value ?? '')}
+    style={{ flexGrow: 1, minWidth: 0, fontSize: 13, color: '#e8e8ed' }}
+  />
+</div>
+```
+
+<Callout type="note">
+  `minWidth: 0` 在这里是必需的：一个需要收缩的 flex 子项没有它就不会收缩到内容宽度以下。规则和 CSS 一致，参见[支持的样式](/docs/styling)。
+</Callout>
+
+## 与键盘的关系
+
+Tab 永远不会向 `<input>` 或 `<textarea>` 中输入一个 tab 字符，这与浏览器一致。一个想要输入 tab 的编辑器会调用 `preventDefault()` 并自行插入它。焦点与键盘派发的完整规则见[焦点与键盘导航](/docs/focus-keyboard)。

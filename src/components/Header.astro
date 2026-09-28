@@ -1,0 +1,84 @@
+---
+import { Icon } from 'astro-icon/components'
+import Search from './Search'
+import ThemeToggle from './ThemeToggle'
+
+const GITHUB = 'https://github.com/remorses/gpuix'
+---
+
+<header
+  class="sticky top-0 z-60 h-16 border-b border-line bg-canvas"
+>
+  <!-- 阅读进度：CSS 滚动驱动，无 scroll 监听 -->
+  <div class="read-progress" aria-hidden="true"></div>
+
+  <div class="mx-auto flex h-full max-w-[104rem] items-center gap-3 px-4 sm:px-6">
+    <button
+      type="button"
+      data-nav-toggle
+      aria-label="打开导航"
+      aria-expanded="false"
+      class="-ml-1 inline-flex size-9 shrink-0 items-center justify-center rounded-[5px] text-ink-muted transition-colors hover:bg-surface hover:text-ink lg:hidden"
+    >
+      <Icon name="ph:list-bold" class="size-[18px]" />
+    </button>
+
+    <a href="/" class="flex shrink-0 items-center gap-2.5" aria-label="GPUIX 首页">
+      <span
+        class="grid size-6 place-items-center rounded-[5px] bg-accent font-mono text-[13px] leading-none font-bold text-accent-ink"
+        >G</span
+      >
+      <span class="text-[0.9375rem] leading-none font-semibold tracking-[-0.01em] text-ink"
+        >GPUIX</span
+      >
+    </a>
+
+    <div class="ml-auto flex items-center gap-1.5">
+      <Search client:idle />
+      <a
+        href={GITHUB}
+        target="_blank"
+        rel="noreferrer noopener"
+        aria-label="在 GitHub 上查看 GPUIX 仓库"
+        class="inline-flex size-9 items-center justify-center rounded-[5px] text-ink-muted transition-colors hover:bg-surface hover:text-ink"
+      >
+        <Icon name="ph:github-logo" class="size-[18px]" />
+      </a>
+      <ThemeToggle client:idle />
+    </div>
+  </div>
+</header>
+
+<script>
+  // 移动端侧边栏抽屉
+  const toggle = document.querySelector<HTMLButtonElement>('[data-nav-toggle]')
+  const sidebar = document.getElementById('docs-sidebar')
+  const backdrop = document.getElementById('sidebar-backdrop')
+
+  function setSidebar(open: boolean) {
+    if (!sidebar || !toggle) return
+    sidebar.classList.toggle('-translate-x-full', !open)
+    sidebar.classList.toggle('translate-x-0', open)
+    backdrop?.classList.toggle('invisible', !open)
+    backdrop?.classList.toggle('visible', open)
+    backdrop?.classList.toggle('opacity-100', open)
+    backdrop?.classList.toggle('opacity-0', !open)
+    toggle.setAttribute('aria-expanded', String(open))
+    document.documentElement.style.overflow = open ? 'hidden' : ''
+    if (open) sidebar.querySelector<HTMLAnchorElement>('a')?.focus()
+  }
+
+  toggle?.addEventListener('click', () => {
+    setSidebar(toggle.getAttribute('aria-expanded') !== 'true')
+  })
+  backdrop?.addEventListener('click', () => setSidebar(false))
+  sidebar?.addEventListener('click', (event) => {
+    if ((event.target as HTMLElement).closest('a')) setSidebar(false)
+  })
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') setSidebar(false)
+  })
+  window.addEventListener('resize', () => {
+    if (window.innerWidth >= 1024) setSidebar(false)
+  })
+</script>

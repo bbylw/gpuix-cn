@@ -1,0 +1,290 @@
+---
+title: 虚拟列表
+description: '可变行高、聊天尾部跟随、滚动锚定，以及为什么裁剪比 memo 更重要。'
+eyebrow: 组件
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+将 `<virtual-list>` 用于**长且高度可变的集合**，例如消息列表。React 与 Rust 会保留每一行，但 GPUI 只构建、布局并绘制靠近视口的那些行。
+
+```tsx
+function MessageList({ messages }: { messages: Message[] }) {
+  return (
+    <virtual-list
+      alignment="bottom"
+      followTail
+      estimatedItemHeight={180}
+      style={{ flexGrow: 1, minHeight: 0 }}
+    >
+      {messages.map((message) => (
+        <Message key={message.id} message={message} />
+      ))}
+    </virtual-list>
+  )
+}
+```
+
+该列表需要一个**有界的高度**或有界的 flex 空间。它的直接子元素是行，可以包含任意 GPUIX 宿主或自定义元素。
+
+| 属性 | 默认值 | 用途 |
+|---|---:|---|
+| `alignment` | `"top"` | 聊天风格初始定位请使用 `"bottom"` |
+| `followTail` | `false` | 在用户滚走之前，跟随追加的行 |
+| `overdraw` | `512` | 在视口之外额外构建的像素 |
+| `estimatedItemHeight` | 无 | 未测量行的高度提示。配合 `itemCount` 时**必填** |
+
+## 虚拟化是如何工作的
+
+**React 协调（reconciliation）保持正常。** 完整的带 key 子元素列表会跨越 mutation 协议，并保留在 Rust 的 retained 树中。GPUIX 只把昂贵的 GPUI 元素构建、布局与绘制工作推迟。
+
+```text
+React Fiber + Rust RetainedTree    all row IDs, props, text, and events
+                 │
+                 ▼
+          GPUI ListState          row count and measured height cache
+                 │
+                 ▼ visible indexes plus overdraw
+          cx.processor            re-enters GpuixView after root render
+                 │
+                 ▼
+          fresh BuildCtx          builds only the requested React subtree
+                 │
+                 ▼
+       GPUI layout and paint      visible rows only
+```
+
+## 行高
+
+**行不需要等高，你也不必知道它们的高度。** GPUI 会在某一行进入视口时测量它。`estimatedItemHeight` 是**对尚未被测量的行的提示**，而非一份尺寸契约。
+
+```text
+index:     0        1        2        3        4        5        6        7
+       ┌────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┐
+       │  hint  │  hint  │measured│measured│measured│  hint  │  hint  │  hint  │
+       │  220px │  220px │  184px │  512px │   96px │  220px │  220px │  220px │
+       └────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┘
+           ▲                          ▲                          ▲
+           │                          │                          │
+     estimate only         real, variable heights          estimate only
+                          (viewport plus overdraw)
+```
+
+该高度缓存的总和就是滚动长度，因此粗略的估计只会影响**滚动条的准确性**（在某一行被访问之前）。测量得到的高度会自动替换估计值，滚动条也会随着滚动而收敛。
+
+当一个 retained 后代发生变化时，GPUIX 会把它所在的那个直接行标记为需要重新测量，因此一个正在流式增长的行能够正确变高。追加、移除或重排带 key 的行时，ID 未变的那些行的测量结果会被保留。
+
+在 children 模式下，`estimatedItemHeight` 是可选的 —— 此时每一行都存在且可被测量。配合 `itemCount` 时它**是必填的**，因为 React 永远不会挂载窗口之外的行，原生层也就没有可测量的元素。那些索引在 React 挂载真实行之前，会渲染成一个具有估计高度的空盒子。
+
+## 行的边界
+
+每一个**直接宿主子元素**就是一行虚拟行。给每一行一个稳定的 React key 和一个宿主根节点：
+
+```tsx
+<virtual-list style={{ height: 500 }}>
+  {messages.map((message) => (
+    <div key={message.id} style={{ paddingBottom: 24 }}>
+      <Message message={message} />
+    </div>
+  ))}
+</virtual-list>
+```
+
+一行里可以包含嵌套的 `<div>`、`<text>`、`<markdown>`、`<code>`、`<diff>`、`<input>` 与 `<textarea>` 元素。可聚焦的行在移出屏幕后仍然保持活跃，因此键盘输入与原生编辑器状态都会被保留。这些子元素自身不能滚动。嵌套滚动不受支持；参见[滚动](/docs/scrolling)。
+
+<Callout type="note">
+  `<virtual-list>` 不接受 `testId`、`hover` / `active` 样式，也不接受 `onFileDrop`。请把这些放在包裹用的 `<div>` 上 —— gpui 的列表不是交互元素，没有可持有状态的交互身份，也无法记录边界盒子。
+</Callout>
+
+## 聊天尾部行为
+
+组合 `alignment="bottom"` 与 `followTail` 用于聊天线程：
+
+```tsx
+<virtual-list
+  alignment="bottom"
+  followTail
+  estimatedItemHeight={220}
+  style={{ flexGrow: 1, minHeight: 0 }}
+>
+  {turns.map((turn) => (
+    <ChatTurn key={turn.id} turn={turn} />
+  ))}
+</virtual-list>
+```
+
+当用户处于底部时，列表会跟随新行。向上滚动会暂停尾部跟随；回到底部后会再次启用。一个正在流式输出的最后一行会随着内容增长而被重新测量。
+
+## 滚动锚定
+
+列表锚定在**行索引**上，而非像素偏移上。在 children 模式下，React 会按 key 进行协调，因此即使在前面插入内容，该索引仍然落在同一行上：屏幕上已有的行会保持在原处。浏览器的做法相同，并称之为滚动锚定（scroll anchoring）。
+
+唯一的例外（同样照搬自浏览器）：一个顶端对齐、并且已经滚动到**最顶部**的列表会保持在顶部，因此前面插入的行是可见的。
+
+```text
+scrolled down                          pinned to the top
+┌──────────────────┐                   ┌──────────────────┐
+│ new row  (above) │  ◄── inserted     │ new row          │  ◄── inserted, visible
+├──────────────────┤                   ├──────────────────┤
+│ ░░ viewport ░░░░ │  stays put        │ ░░ viewport ░░░░ │  follows the insert
+│ ░░░░░░░░░░░░░░░░ │                   │ ░░░░░░░░░░░░░░░░ │
+└──────────────────┘                   └──────────────────┘
+```
+
+这正是待办列表或信息流想要的行为：`setItems((current) => [fresh, ...current])` 会把新行放到屏幕上。而一个在用户阅读时加载更早分页的历史面板，则应该使用 `alignment="bottom"`，这样页面加载永远不会移动文本。
+
+### 使用 itemCount 时
+
+<Callout type="important" title="修正工作由应用自己负责">
+  没有可供协调的 key，因此索引就是一切。在前面插入会把每一行都向下挪一个位置，而锚点仍指向那个旧的数字，于是内容恰好滑动了你插入的行数。请把 `windowStart` 移动相同的数量：
+
+  ```tsx
+  const prepend = (fresh: Row) => {
+    setRows((current) => [fresh, ...current])
+    // 锚点是一个索引。窗口上方多出一行，意味着每一行都已下移一格，
+    // 因此窗口也必须随之移动。
+    setWindowStart((start) => (start === 0 ? 0 : start + 1))
+  }
+  ```
+
+  不要去改动处于 `0` 的 `windowStart`；列表在那儿被钉在顶部，新行应当可见。
+</Callout>
+
+## 编程式滚动
+
+使用一个 ref 来调用与普通滚动容器相同的 renderer 滚动方法：
+
+```tsx
+function Results({ rows }: { rows: Result[] }) {
+  const renderer = useGpuixRequired()
+  const listRef = useRef<{ id: number } | null>(null)
+
+  const reveal = (index: number) => {
+    if (listRef.current) {
+      renderer.scrollToItem?.(listRef.current.id, index)
+    }
+  }
+
+  return (
+    <>
+      <virtual-list ref={listRef} style={{ height: 400 }}>
+        {rows.map((row) => (
+          <ResultRow key={row.id} row={row} />
+        ))}
+      </virtual-list>
+      <div onClick={() => reveal(rows.length - 1)}>Reveal latest</div>
+    </>
+  )
+}
+```
+
+`scrollTo`、`scrollToItem` 与 `getScrollOffset` 都支持虚拟列表。
+
+在虚拟列表上，`scrollToItem` 接受一个可选的**像素偏移**，并且列表会报告它的逻辑锚点：
+
+```ts
+renderer.scrollToItem(listId, index, offsetInItem)  // 偏移单位为 px，可以为负
+renderer.getListScrollTop(listId)  // [itemIndex, offsetInItemPx, viewportHeightPx] 或 null
+```
+
+**负的偏移会把视口顶部锚定在行的上方**，下一次布局会用真实的测量高度来解析它。这正是无限滚动历史所需的工具：当读者停留在一个加载行时，读取 `getListScrollTop`，提交已获取的分页，然后用一个负偏移重新锚定到原本位于加载行下方的那条消息上。在新行于其上方完成测量期间，该消息会停留在相同的像素位置 —— 具体可参考 `examples/infinite-chat.tsx` 这个完整示例。
+
+一个等于条目总数的 `itemIndex` 是 gpui 的**末尾哨兵（at-end sentinel）**：一个 resting 在最末端、底端对齐的列表。停留在尾部加载行的读者通常就位于此处，而同一元组中的视口高度正是把它转换为相对于尾部各行的位置的东西（示例中为 `EDGE_HEIGHT - viewportHeight`）。
+
+虚拟列表的 `scrollToItem` 调用会在**下一帧的子元素拼接之后、下一次渲染时**生效，因此一个针对刚刚提交的子元素列表计算出来的索引永远不会被偏移两次。
+
+## 性能模型
+
+| 工作 | 普通滚动容器 | `<virtual-list>` children | `<virtual-list>` + `itemCount` |
+|---|---|---|---|
+| React Fiber 节点 | 所有行 | 所有行 | 可见窗口 |
+| Rust retained 节点 | 所有行 | 所有行 | 可见窗口 |
+| GPUI 行构建 | 所有行 | 可见行加 overdraw | 可见行加 overdraw |
+| 布局与绘制 | 所有行 | 可见行加 overdraw | 可见行加 overdraw |
+| 高度元数据 | 无 | 每行一个轻量条目 | 每个逻辑行一个轻量条目 |
+
+children 形式仍然会创建每一个 React 子元素，因此一个一万行的 `turns.map` 挂载起来很慢。传入 `itemCount` 与 `windowStart`，并且只渲染那一个切片，才能同样把窗口挂载出来。拥有数百万行的集合仍然需要应用层的分页，或一个拥有数据的原生元素。
+
+## 保持滚动流畅
+
+滚轮事件会通知窗口视图。随后 GPUI 会重新构建**可见的**那些行，并由 Taffy 再次布局。绘制时间消耗在这些行上，而非列表的长度上。
+
+把长列表放到 `<virtual-list>` 上。让 `overdraw` 保持在一个额外视口左右。把庞大的内容放进单个原生节点（`<markdown>`、`<code>`、`<diff>`），而不是一棵 React span 树。
+
+宿主 `<virtual-list>` 仍然会保留每一个 React 子元素。传入 `itemCount`、`estimatedItemHeight` 与 `windowStart`，然后只渲染那个窗口，这样挂载时就不会创建每一行。当缺少估计值时，原生层会忽略 `itemCount`，因此一次跳转不会把未挂载的行压缩到高度 0。
+
+**没有 `VirtualList` 包装组件。** 窗口是应用状态：只有应用自己知道它何时必须扩大 —— 例如当某个过滤器在没有发生任何滚动的情况下增大了 `itemCount`。把 `start` 放在 `useState` 里，从 `onVisibleRange` 移动它，并围绕它做切片。
+
+```tsx
+const WINDOW = 40
+
+const Transcript = memo(function Transcript({ turns }: { turns: Turn[] }) {
+  const [start, setStart] = useState(0)
+  const end = Math.min(turns.length, start + WINDOW)
+  return (
+    <virtual-list
+      itemCount={turns.length}
+      windowStart={start}
+      estimatedItemHeight={220}
+      style={{ flexGrow: 1, minHeight: 0 }}
+      onVisibleRange={(event) =>
+        setStart(Math.max(0, Math.floor(event.startIndex ?? 0) - WINDOW / 4))
+      }
+    >
+      {turns.slice(start, end).map((turn) => (
+        <ChatTurn key={turn.id} turn={turn} />
+      ))}
+    </virtual-list>
+  )
+})
+
+function ChatApp() {
+  const [collapsed, setCollapsed] = useState(false)
+  const [turns, setTurns] = useState(initialTurns)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
+      <Sidebar collapsed={collapsed} onCollapse={() => setCollapsed(true)} />
+      <Transcript turns={turns} />
+      <Composer onSend={(text) => setTurns((current) => [...current, { text }])} />
+    </div>
+  )
+}
+```
+
+`turns` 只有在消息到达时才会是一个新数组。Sidebar 与草稿的更新不会动这个引用，因此 `memo` 会跳过这次 map。chat 示例使用的就是这种模式。
+
+宽子元素上的 `overflowX: "scroll"` 不能抢走垂直滚轮。GPUIX 在该路径上设置了 `restrict_scroll_to_axis`。原生的 `overflow_x_scroll()` 必须调用同一个方法。
+
+在滚动时打开 [`debugFrameOverlay: 'full'`](/docs/debug-overlay)。叠加层显示的是**绘制时间**。`8.3 MS` 约等于 120 Hz。
+
+## 可平移表面必须裁剪
+
+`<virtual-list>` 是唯一会做虚拟化的东西。一个由**你**自己掌握偏移的表面 —— 时间轴、节点图、地图 —— 会把它的子元素绝对定位，于是 GPUI 在每一帧都会构建并布局**每一个** retained 子元素。没有任何东西替你跳过它们。
+
+`memo` 与裁剪（culling）分别修复不同的部分，而其中只有一个是绘制：
+
+```text
+memo(Layer)  ►  削减 React 工作以及 applyBatch 的 mutation
+cull in JS   ►  削减 GPUI 构建、Taffy 布局与绘制
+```
+
+你已经知道偏移，因此可见窗口只差一个 `useMemo`：
+
+```tsx
+const visible = useMemo(() => {
+  const from = scrollX / pxPerSecond
+  const to = (scrollX + viewportWidth) / pxPerSecond
+  return clips.filter((clip) => clip.start <= to && clip.start + clip.duration >= from)
+}, [clips, scrollX, pxPerSecond, viewportWidth])
+```
+
+timeline 示例在横跨 26 条轨道、共 3,259 个片段上测量了两者：
+
+| 滚轮平移，单帧 | p50 |
+|---|---|
+| 已裁剪 | **7.7 ms** |
+| 仅 `memo`，不裁剪 | **92 ms** |
+
+<Callout type="important">
+  性能采样必须包含 `renderer.flush()`。否则你计时的只是 React 更新，而不包含随后发生的任何 GPUI 构建、布局与绘制。上面的「仅 `memo`」数字如果忘了这一点，看起来会像 **0.6 ms**。
+</Callout>

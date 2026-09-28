@@ -1,0 +1,170 @@
+---
+title: 原生动画
+description: 'motion.div、AnimatePresence 退场与确定性帧捕获，附目标值与 timing 的取值表。'
+eyebrow: 组件
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+使用 **`motion.div`** 可以从初始样式动画到目标样式。React 只发送一次目标。Rust 会计算中间值，并请求 GPUI 帧，直到过渡结束 —— **每一帧都不需要一次 React 渲染或 N-API 调用**。
+
+## 动画化一个目标
+
+```tsx
+import { motion } from '@gpuix/react'
+
+function WelcomeCard() {
+  return (
+    <motion.div
+      initial={{ width: 0, opacity: 0 }}
+      animate={{ width: 320, opacity: 1 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      style={{ overflow: 'hidden' }}
+    >
+      <text style={{ color: '#ffffff' }}>Welcome</text>
+    </motion.div>
+  )
+}
+```
+
+当元素必须以它的第一个 `animate` 目标挂载时，设置 **`initial={false}`**。后续的 `animate` 变化仍会正常过渡。如果目标在动画进行中发生了改变，下一次过渡会从当前可见的值开始，因此反向播放动画时不会发生跳变。
+
+## 目标与计时
+
+Motion 目前接受以下**数值目标**：
+
+| 目标 | 取值范围或单位 |
+|---|---|
+| `width`、`height` | 像素，零或更大 |
+| `top`、`right`、`bottom`、`left` | 像素 |
+| `opacity` | `0` 到 `1` |
+| `borderRadius` | 像素，零或更大 |
+
+**transition** 使用秒，与 Motion for React 一致：
+
+| 选项 | 默认值 | 取值 |
+|---|---:|---|
+| `duration` | `0.3` | 非负数秒 |
+| `delay` | `0` | 非负数秒 |
+| `ease` | `"easeOut"` | `"linear"`、`"ease"`、`"easeIn"`、`"easeOut"`、`"easeInOut"`，或 `[x1, y1, x2, y2]` |
+
+<Callout type="note">
+  弹簧（springs）、关键帧（keyframes）、变体（variants）与共享布局动画目前尚不可用。
+</Callout>
+
+## 动画化侧边栏
+
+动画化一个**外层裁剪容器**，并让内层侧边栏保持固定宽度。这样可以在不每帧重排其文本的情况下显示或隐藏内容。
+
+```tsx
+import { motion } from '@gpuix/react'
+import type { ReactNode } from 'react'
+
+function SidebarFrame({
+  collapsed,
+  children,
+}: {
+  collapsed: boolean
+  children: ReactNode
+}) {
+  const sidebarWidth = 252
+  const dividerWidth = 1
+
+  return (
+    <motion.div
+      initial={false}
+      animate={{ width: collapsed ? 0 : sidebarWidth + dividerWidth }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        height: '100%',
+        flexShrink: 0,
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{ width: sidebarWidth, height: '100%', flexShrink: 0 }}>
+        {children}
+      </div>
+      <div style={{ width: dividerWidth, height: '100%', flexShrink: 0 }} />
+    </motion.div>
+  )
+}
+```
+
+**chat 示例** 使用的就是这种模式。侧边栏在外层宽度于 `253` 到 `0` 像素之间移动时始终保持挂载。
+
+## 动画化卸载
+
+带有 **`exit`** 的 `motion.div` 只有在目标完成后才会离开，并且仅当它作为 **`AnimatePresence`** 的子元素时如此。若没有 `AnimatePresence`，React 会在同一次提交中销毁该节点。
+
+```tsx
+import { AnimatePresence, motion } from '@gpuix/react'
+
+function Toast({ show }: { show: boolean }) {
+  return (
+    <AnimatePresence>
+      {show ? (
+        <motion.div
+          key="toast"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+        >
+          <text>Saved</text>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  )
+}
+```
+
+当可能有多于一个子元素离开时，给每个子元素一个**唯一的 `key`**。在 `AnimatePresence` 上设置 **`initial={false}`** 可跳过首次绘制时的进入动画。没有 `exit` 的子元素会在无补间的情况下被移除。当目标已经匹配、节点位于虚拟列表已绘制窗口之外，或无效的运行期数据导致原生目标不可用时，退出仍然会完成。
+
+`AnimatePresence` 还接受 **`onExitComplete`**，它在每个离开的子元素都消失之后运行。`useIsPresent()` 报告一个自定义后代是否正在离开。`usePresence()` 返回同样的状态外加 `safeToRemove`，用于一个自行决定何时可以卸载 retained 子元素的自定义退出。
+
+```tsx
+import { usePresence } from '@gpuix/react'
+
+function DeferredRemoval() {
+  const [isPresent, safeToRemove] = usePresence()
+
+  return (
+    <div onClick={() => !isPresent && safeToRemove?.()}>
+      <text>{isPresent ? 'Ready' : 'Click to remove'}</text>
+    </div>
+  )
+}
+```
+
+`motion.div` 接受 **`onMotionComplete`**。它在当前原生目标落定时运行。如果 React 在较早的完成到达 JavaScript 之前改变了目标，那个过期的完成会被忽略。
+
+## 捕获精确的帧
+
+[自动化 API](/docs/automation) 可以冻结原生 motion 时钟并渲染特定的时间戳。这避免了定时器 sleep，并让 CI 在每次运行中都得到相同的帧。
+
+```tsx
+import { connectTest } from '@gpuix/react/automation'
+import { createTestRoot } from '@gpuix/react/testing'
+import { ChatApp } from './chat'
+
+const { render, renderer } = createTestRoot()
+render(<ChatApp />)
+const app = await connectTest(renderer)
+
+const startedAt = await app.clock.pause()
+await app.getByTestId('sidebar-collapse').click()
+
+await app.captureFrames('review/sidebar', [
+  startedAt,
+  startedAt + 50,
+  startedAt + 100,
+  startedAt + 150,
+  startedAt + 200,
+])
+
+await app.clock.resume()
+```
+
+`motion.div` 只需要一个数值目标。弹簧、关键帧与共享布局动画仍在计划中；带 `exit` 的退场过渡与确定性帧捕获已经可用。

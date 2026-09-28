@@ -1,0 +1,85 @@
+---
+import type { MarkdownHeading } from 'astro'
+import Base from './Base.astro'
+import Header from '../components/Header.astro'
+import Sidebar from '../components/Sidebar.astro'
+import Toc from '../components/Toc.astro'
+import CodeEnhance from '../components/CodeEnhance.astro'
+import type { NavItem } from '../lib/nav'
+
+interface Props {
+  title: string
+  description: string
+  headings: MarkdownHeading[]
+  eyebrow?: string
+  prev?: NavItem
+  next?: NavItem
+}
+
+const { title, description, headings, eyebrow, prev, next } = Astro.props
+---
+
+<Base title={`${title} - GPUIX 中文文档`} description={description}>
+  <Header />
+  <div class="mx-auto flex max-w-[104rem]">
+    <Sidebar />
+
+    <main id="main" class="min-w-0 flex-1 px-4 pt-10 pb-24 sm:px-8 lg:px-10">
+      <div class="mx-auto flex w-full max-w-[74rem] gap-14">
+        <article class="min-w-0 flex-1">
+          <header class="mb-10">
+            {
+              eyebrow && (
+                <p class="label-mono mb-2.5 text-accent">{eyebrow}</p>
+              )
+            }
+            <h1 class="text-[2.05rem] leading-[1.2] font-semibold tracking-[-0.022em] text-balance text-ink">
+              {title}
+            </h1>
+            <p class="mt-3 max-w-[62ch] text-[1.0625rem] leading-relaxed text-pretty text-ink-muted">
+              {description}
+            </p>
+          </header>
+
+          <div class="prose-doc">
+            <slot />
+          </div>
+
+          <nav aria-label="上一页 / 下一页" class="mt-16 grid gap-3 sm:grid-cols-2">
+            {
+              prev ? (
+                <a
+                  href={prev.href}
+                  class="group flex flex-col gap-1 rounded-[6px] border border-line p-4 transition-colors hover:border-line-strong hover:bg-canvas-subtle"
+                >
+                  <span class="label-mono">上一页</span>
+                  <span class="text-[0.9375rem] font-medium text-ink">{prev.title}</span>
+                </a>
+              ) : (
+                <span />
+              )
+            }
+            {
+              next && (
+                <a
+                  href={next.href}
+                  class="group flex flex-col items-end gap-1 rounded-[6px] border border-line p-4 transition-colors hover:border-line-strong hover:bg-canvas-subtle sm:col-start-2"
+                >
+                  <span class="label-mono">下一页</span>
+                  <span class="text-[0.9375rem] font-medium text-ink">{next.title}</span>
+                </a>
+              )
+            }
+          </nav>
+        </article>
+
+        <aside class="hidden w-56 shrink-0 xl:block">
+          <div class="sticky top-[5.5rem] max-h-[calc(100dvh-7.5rem)] overflow-y-auto pr-1 pb-8 scroll-slim">
+            <Toc headings={headings} />
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+  <CodeEnhance />
+</Base>

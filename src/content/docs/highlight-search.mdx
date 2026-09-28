@@ -1,0 +1,130 @@
+---
+title: 高亮与搜索
+description: 'highlight 属性、useTextSearch 查找栏、显式范围，以及虚拟列表下的计数责任。'
+eyebrow: 文本能力
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+**`highlight` 属性**会在匹配文本背后绘制一层背景色。把它放在任何元素上，就会作用于该元素的子树，因此放在根节点上会搜索整个窗口，而放在某个容器上则只搜索那个容器。
+
+```tsx
+<div highlight={{ query: 'fox' }}>
+  <text>the quick brown fox</text>
+</div>
+```
+
+它能触达 `<text>`、`<code>`、`<markdown>` 与 `<diff>` 而无需额外属性，因为 GPUIX 绘制的每一个字符串都会经过同一个漏斗。
+
+## 一个查找栏
+
+`useTextSearch` 负责光标与计数。`next` 与 `previous` 是普通的事件处理器，因此这里不需要任何 effect。
+
+```tsx
+import { useTextSearch } from '@gpuix/react'
+
+function Find() {
+  const [query, setQuery] = useState('')
+  const search = useTextSearch({ query })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input value={query} onChange={(e) => setQuery(e.value ?? '')} />
+        <text>{search.total === 0 ? 'No results' : `${search.active + 1}/${search.total}`}</text>
+        <div onClick={search.previous}><text>↑</text></div>
+        <div onClick={search.next}><text>↓</text></div>
+      </div>
+
+      <div {...search.props} style={{ flex: 1 }}>
+        <Transcript />
+      </div>
+    </div>
+  )
+}
+```
+
+## 显式范围
+
+当你已经有了偏移量（来自 LSP 范围或你自己的模型）时，直接传入它们，而不是 query。它们是 **UTF-16 码元**下的 `[start, end)`，也就是 `indexOf` 与 `RegExp.exec` 返回的单位。
+
+```tsx
+<div highlight={{ ranges: [[6, 11]], color: '#f43f5e55' }}>
+  <text>Hello {name}!</text>
+</div>
+```
+
+<Callout type="important">
+  一对会拆分代理对（surrogate pair）的范围是**被拒绝**的，绝不会被吸附取整。范围只索引 retained 文本；原生元素在 Rust 中构建它们自己的字符串，因此那些情况请使用 `query`。
+</Callout>
+
+## 选项
+
+| 字段 | 含义 |
+|---|---|
+| `query` | 要匹配的子串，默认大小写不敏感 |
+| `caseSensitive` | 仅精确匹配大小写 |
+| `wholeWord` | 两侧相邻字符都不能是字母数字或 `_` |
+| `ranges` | 显式的 `[start, end)` UTF-16 范围对 |
+| `color` / `activeColor` | 任意 CSS 颜色；默认值来自主题 |
+| `activeIndex` | 哪个匹配获得 `activeColor`，用于查找光标 |
+| `matchIndexOffset` | 该子树之前的匹配数；仅用于虚拟化内容 |
+| `radius` | 背景色的圆角半径，默认 2 |
+
+传入一个**数组**可以一次性绘制多个，例如搜索匹配项加上一处常驻的提及着色。靠后的条目绘制在更上层。
+
+## 匹配规则
+
+Matches are **non-overlapping** and leftmost-first. Case-insensitive matching uses Unicode **lowercasing**, not full case folding, so `ﬀ` does not match `ff`. A word boundary is any code point that is not Unicode Alphabetic, a digit, or `_`.
+
+A match never crosses a line, exactly like browser find. It **does** cross the several host nodes React creates for one interpolated line, which matters more than it sounds:
+
+```tsx
+// React makes 3 host text nodes here. `Hello Tommy` still matches.
+<div highlight={{ query: 'Hello Tommy' }}>
+  <text>Hello {name}!</text>
+</div>
+```
+
+最近的声明胜出，因此一个嵌套的 `highlight` 会为那个子树替换掉其祖先的声明。
+
+## 搜索一个虚拟列表
+
+`<virtual-list>` 永远不会构建屏幕外的行，因此原生层只能看到已挂载的窗口。由此带来两点推论，并且两者都是应用的责任，因为行数据由应用掌握。
+
+**自己统计匹配数**，使用 `findRanges`，它会在你提供的字符串上运行与原生匹配器相同的算法。
+
+**说明你的窗口从哪里开始**，以一个它**上方**的**匹配数**来计，而不是行索引。若不说明，原生层会从零开始给已挂载的行编号，`activeIndex` 就会变成「第 n 个可见匹配」，而查找光标就会落到错误的行上。
+
+这两个数字在 `matches` 中一起传递，因为只给其中一个而漏掉另一个永远是错误的。
+
+```tsx
+import { findRanges, useTextSearch } from '@gpuix/react'
+
+// 每行一项，因此前缀和能同时给出这两个数字。
+const perRow = useMemo(
+  () => rows.map((row) => findRanges({ text: row.text, query }).length),
+  [rows, query],
+)
+
+const search = useTextSearch({
+  query,
+  matches: {
+    total: perRow.reduce((n, count) => n + count, 0),
+    indexOffset: perRow.slice(0, windowStart).reduce((n, count) => n + count, 0),
+  },
+})
+
+// search.next() 移动光标；滚动由你来做
+listRef.current.scrollToItem(rowOfMatch(search.active))
+```
+
+`findRanges` 对**同一**字符串匹配原生的算法。请在原生层绘制的相同逻辑行上调用它：同一个父元素下相邻的文本节点算作一行，而 `<markdown>` 绘制的是内联片段（run）而非其源码。
+
+## 为什么是背景色块
+
+`HighlightStyle.background_color` 由 gpui 在原生层绘制，但只有方角，而且无法报告它绘制出的盒子。GPUIX 从 `range_rects`（与选区及行内代码药丸相同的辅助函数）绘制四边形，因此一个软换行后的匹配在每一视觉行上是一个盒子，`getPaintedHighlights()` 无需截图就能对几何做断言。Zed 自己的编辑器出于同样的原因也手动绘制搜索高亮。参见[测试](/docs/testing)。
+
+<Callout type="note">
+  `userSelect: "none"` 并不会退出搜索。浏览器仍然能找到那段文本，因此 GPUIX 仍然会高亮它。只有元素自身的装饰（chrome）、代码行号槽或 diff 文件头会被排除。
+</Callout>

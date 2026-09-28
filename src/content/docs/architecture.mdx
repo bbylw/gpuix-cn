@@ -1,0 +1,111 @@
+---
+title: 架构
+description: '三层数据流：JS 侧的 mutation 队列、Rust 侧的 RetainedTree，以及 GPUI 每帧的立即模式重建。'
+eyebrow: 核心概念
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+GPUIX 通过一套**基于共享 mutation 的运行时**把 React 和 Solid 桥接到 GPUI。桌面应用使用 napi-rs；浏览器应用则通过 wasm-bindgen 加载同一个 Rust 渲染器。每个框架 adapter 都会把发生变化的元素收集成一次原子的 mutation 批次。Rust 将该批次应用到一棵 retained 元素树上，GPUI 每一帧都会读取这棵树。
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  React or Solid (JavaScript)                                    │
+│                                                                 │
+│  function App() {                                               │
+│    const [count, setCount] = useState(0)                        │
+│    return (                                                     │
+│      <div style={{ display: 'flex', gap: 8 }}>                  │
+│        <div onClick={() => setCount(c => c + 1)}>               │
+│          Count: {count}                                         │
+│        </div>                                                   │
+│      </div>                                                     │
+│    )                                                            │
+│  }                                                              │
+└─────────────────────────────────────────────────────────────────┘
+                    │ napi desktop / wasm-bindgen browser
+                    │ applyBatch([
+                    │   ["createElement", 1, "div"],
+                    │   ["setStyle", 1, {...}],
+                    │   ["setRoot", 1]
+                    │ ])
+                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Rust host bridge                                               │
+│                                                                 │
+│  RetainedTree ── stores elements, styles, event flags           │
+│       │                                                         │
+│       ▼  each GPUI frame                                        │
+│  GpuixView::render() → build_element() → GPUI elements          │
+└─────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  GPUI                                                           │
+│                                                                 │
+│  Metal, DirectX, Vulkan, or browser WebGPU / WebGL2             │
+│  Flexbox layout via Taffy                                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## 为什么这样可行
+
+GPUI 是一个**立即模式（immediate-mode）**的 UI 框架 —— 它每一帧都会重建整个元素树。GPUIX 没有去对抗这一点，而是顺势而为：
+
+1. React 或 Solid 的 adapter 检测到状态变化，并将宿主 mutation（`createElement`、`setStyle`、`appendChild` 等）排入队列。
+2. `applyBatch()` 校验并把完整的提交应用到 Rust 的 **RetainedTree**。
+3. 在每一帧 GPUI 中，`GpuixView::render()` 遍历 RetainedTree 并调用 `build_element()` 来生成临时的 GPUI 元素。
+4. GPUI 对其进行布局（Taffy flexbox）并渲染到 GPU。
+5. 只有**发生变化的元素**才会跨越 FFI 边界。框架 adapter 发送的是最小化的 mutation。
+
+换句话说：JS 侧维护的是一棵**保留树**（retained tree），GPUI 侧维护的是**立即模式**的每帧重建。昂贵的那部分（布局与绘制）留在 GPUI 里，昂贵但不必要的那部分（跨 FFI 的变更传输）被压到最小。
+
+## Mutation API
+
+JS 与 Rust 之间的 mutation 接口是同一个原子方法。桌面端使用 napi，浏览器端使用 wasm-bindgen：
+
+```ts
+type MutationHost = Pick<GpuixRenderer, 'applyBatch'>
+```
+
+`createMutationQueue` 只需要它。窗口尺寸、焦点与选区使用更小的宿主类型（`WindowSizeHost`、`SelectionHost`）。`NativeRenderer` 就是 `MutationHost` 再加上这些方法，因此一个假的（fake）实现只需实现 `applyBatch` 即可。
+
+## 元素 ID 的分配
+
+元素 ID 是 JS 端用递增计数器生成的普通数字。React 在并发渲染模式下可能会放弃某些工作，因此 GPUIX 会把新的宿主节点暂存在 JS 中，直到 React 在提交（commit）阶段把被接受的子树安置好。只有在那时，它的 mutation 才会被加入批次。`applyBatch()` 会以原子方式应用这次被接受的提交，并把 Rust 视图标记为「下一帧需要重绘（dirty）」。
+
+## 事件流
+
+事件从 GPUI 经由桌面端的 `ThreadsafeFunction`（以及浏览器端的 wasm-bindgen 回调）回传到 React。
+
+```text
+User clicks element id=3
+       │
+       ▼
+GPUI fires on_click on the element
+       │
+       ▼
+Rust closure calls emit_event_full(callback, 3, "click", {x, y, ...})
+       │
+       ▼
+Desktop ThreadsafeFunction / browser callback sends EventPayload
+       │
+       ▼
+JS event registry: eventHandlers.get(3)?.get("click")?.(payload)
+       │
+       ▼
+React handler runs: onClick={() => setCount(c => c + 1)}
+       │
+       ▼
+State update triggers re-render → reconciler sends mutations back to Rust
+```
+
+事件处理器存放在 JS 侧的一个注册表中，以 `(elementId, eventType)` 为键。Rust 只知道某个元素**是否有**监听器（通过 `setEventListener`），而不知道闭包本身 —— 真正的处理器位于 JS 中。
+
+<Callout type="note">
+  这个设计的直接后果是：GPUI **不会**像 DOM 那样让点击冒泡。命中测试在 GPUI 的绘制盒子列表上是扁平的，命中哪个就派发给哪个。相关注意事项见[支持的样式](/docs/styling)与[无样式控件](/docs/headless-controls)。
+</Callout>
+
+## 两个框架的分工
+
+React 与 Solid 共用同一套 ID、mutation 队列、事件路由、测试 API、自动化客户端、观察者以及文本搜索匹配器。它们各自框架相关的调度器与组件上下文则保留在各自的 adapter 包中。

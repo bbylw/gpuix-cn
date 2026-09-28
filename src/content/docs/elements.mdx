@@ -1,0 +1,48 @@
+---
+title: 支持的元素
+description: GPUIX 支持的宿主元素列表：div、text、code、diff、markdown、input、textarea、virtual-list、img、svg、anchored、canvas。
+eyebrow: 参考
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+| 元素 | 描述 |
+|---|---|
+| `div` | 使用 flexbox 布局的容器 |
+| `text` | 文本内容，可选中 |
+| `code` | 带语法高亮的代码块 |
+| `diff` | 统一格式 diff 查看器。默认随父元素流动 |
+| `markdown` | GitHub 风格 markdown |
+| `input` | 原生单行文本编辑器 |
+| `textarea` | 原生多行、自动增高的文本编辑器 |
+| `virtual-list` | 长集合；只构建可见的行 |
+| `img` | 本地、data URL，或 http(s) 的位图或 SVG 图像 |
+| `svg` | 可染色的单色 SVG 图标，来自源码或磁盘 |
+| `anchored` | 定位浮层 |
+| `canvas` | 自定义绘制（计划中） |
+
+## 几处差异
+
+<Callout type="important">
+  **GPUIX 没有 `<button>`。** 一个带 `onClick` 的 `div` 既无法用 Tab 到达，也会忽略键盘。内置的 [`Button` 原语](/docs/headless-controls) 就是为此准备的：它基于 [Base UI Button](https://base-ui.com/react/components/button)，提供 tab 停靠点、`role="button"` 与 Enter / Space 行为。
+</Callout>
+
+<Callout type="warning">
+  **不要把 `<text>` 嵌套进 `<text>`。** 相邻的 `<text>` 兄弟会合并成一行；另一个 `<text>` 内的 `<text>` 子项则会被当作一个嵌套 div 处理。
+</Callout>
+
+<Callout type="note">
+  **GPUI 的默认文本颜色是黑色而非白色。** 与 CSS 不同，GPUI 不会从父元素继承 `color`。每一个没有显式设置 `color` 样式的 `<text>` 元素都会渲染为黑色 —— 在深色背景上会不可见。请在文本元素或父级 `<div>` 上设置 `color`。
+</Callout>
+
+## 各元素详见
+
+| 元素 | 文档 |
+|---|---|
+| `code` / `diff` / `markdown` | [原生文本组件](/docs/native-text) |
+| `input` / `textarea` | [文本输入](/docs/text-input) |
+| `virtual-list` | [虚拟列表](/docs/virtual-list) |
+| `img` / `svg` | [图像与图标](/docs/images) |
+| `anchored` | [无样式控件](/docs/headless-controls) |
+| 事件属性 | [支持的事件](/docs/events) |
+| 布局与视觉样式 | [支持的样式](/docs/styling) |

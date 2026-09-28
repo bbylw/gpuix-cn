@@ -1,0 +1,117 @@
+---
+/**
+ * 为正文中的所有代码块补充语言标签与「复制」按钮。
+ * 代码块是静态 HTML，所以用一段增强脚本比逐块挂载 React 岛屿更合适。
+ */
+---
+
+<script>
+  const LABELS: Record<string, string> = {
+    ts: 'TypeScript',
+    tsx: 'TSX',
+    typescript: 'TypeScript',
+    js: 'JavaScript',
+    jsx: 'JSX',
+    javascript: 'JavaScript',
+    json: 'JSON',
+    bash: 'bash',
+    sh: 'shell',
+    shell: 'shell',
+    toml: 'TOML',
+    html: 'HTML',
+    css: 'CSS',
+    text: 'text',
+    textcode: 'text',
+  }
+
+  function languageOf(pre: Element): string {
+    const raw =
+      pre.getAttribute('data-language') ??
+      (pre.closest('figure')?.getAttribute('data-language') ?? '')
+    const key = raw.toLowerCase()
+    return LABELS[key] ?? (key ? key.toUpperCase() : '')
+  }
+
+  async function copy(text: string): Promise<boolean> {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // 非安全上下文下 clipboard API 不可用，退回 execCommand
+      try {
+        const area = document.createElement('textarea')
+        area.value = text
+        area.setAttribute('readonly', '')
+        area.style.cssText = 'position:fixed;opacity:0;pointer-events:none'
+        document.body.append(area)
+        area.select()
+        // execCommand 已废弃，但仍是 Clipboard API 不可用时唯一的兜底
+        const ok = document.execCommand('copy')
+        area.remove()
+        return ok
+      } catch {
+        return false
+      }
+    }
+  }
+
+  function enhance(pre: HTMLPreElement) {
+    if (pre.dataset.enhanced === 'true') return
+    pre.dataset.enhanced = 'true'
+
+    const code = pre.querySelector('code')
+    if (!code) return
+    const text = code.innerText.replace(/\n$/, '')
+
+    const bar = document.createElement('div')
+    bar.className = 'code-toolbar'
+
+    const label = languageOf(pre)
+    if (label) {
+      const span = document.createElement('span')
+      span.className = 'code-lang'
+      span.textContent = label
+      bar.append(span)
+    }
+
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'code-copy'
+    button.setAttribute('aria-label', '复制这段代码')
+    button.textContent = '复制'
+
+    button.addEventListener('click', async () => {
+      const ok = await copy(text)
+      button.classList.add(ok ? 'is-done' : 'is-failed')
+      button.textContent = ok ? '已复制' : '复制失败'
+      window.setTimeout(() => {
+        button.classList.remove('is-done', 'is-failed')
+        button.textContent = '复制'
+      }, 1800)
+    })
+
+    bar.append(button)
+
+    const figure = pre.closest('figure')
+    if (figure) {
+      figure.classList.add('code-frame')
+      figure.insertBefore(bar, pre)
+    } else {
+      const wrap = document.createElement('div')
+      wrap.className = 'code-frame'
+      pre.parentNode!.insertBefore(wrap, pre)
+      wrap.append(bar, pre)
+    }
+  }
+
+  function enhanceAll() {
+    document
+      .querySelectorAll<HTMLPreElement>('.prose-doc pre, .prose-doc figure.astro-code pre')
+      .forEach(enhance)
+  }
+
+  enhanceAll()
+  // 客户端导航切页后重新增强
+  document.addEventListener('astro:after-swap', enhanceAll)
+  document.addEventListener('astro:page-load', enhanceAll)
+</script>

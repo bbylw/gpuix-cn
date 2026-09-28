@@ -1,0 +1,21 @@
+---
+title: flushSync
+description: flushSync 强制让 React 的渲染与提交在返回之前完成，一直到底层的一次 applyBatch 调用。
+eyebrow: 窗口与渲染器
+---
+
+该 root 是一个**并发 root**，因此 React 会在随后的微任务中提交。`flushSync` 会强制让渲染与提交在返回之前完成，这与 `react-dom` 中的行为一致。
+
+```tsx
+import { flushSync } from '@gpuix/react'
+
+flushSync(() => setSidebarOpen(true))
+```
+
+它只 flush **React 本身**，一直到底层的一次 `applyBatch` 调用。返回之后，原生 retained 树（包括样式与文本）就是最新的。
+
+<Callout type="note">
+  它**不会**等待 GPUI。布局与绘制仍然发生在下一帧，就像浏览器在 DOM 变更之后才绘制一样。要看到像素，可以在应用里等一帧，或者在测试中调用 `renderer.flush()`。
+</Callout>
+
+当一个顺序相关的 bug 依赖于提交先落地时使用它：例如先卸载再重新挂载，或者先改变状态再喂入下一个事件。

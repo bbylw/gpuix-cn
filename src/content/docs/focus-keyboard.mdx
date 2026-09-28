@@ -1,0 +1,154 @@
+---
+title: 焦点与键盘导航
+description: 'tab 顺序、键盘事件的派发路径、默认动作的取消方式，以及命令式聚焦 API。'
+eyebrow: 组件
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+焦点是一个**原生 GPUI 概念**。GPUIX 会把稳定的 React 元素 ID 连接到持久的 `gpui::FocusHandle` 值上，因此焦点在 React 重新渲染后依然保留：
+
+```text
+React <div tabIndex={0}>
+            │
+            ▼
+Retained element ID ► persistent gpui::FocusHandle ► keyboard/action dispatch
+            ▲
+            │
+      React rerenders
+```
+
+`<input>` 与 `<textarea>` 会自动成为 tab 停靠点。当一个 `div` 需要参与显式的焦点遍历时，给它加上 `tabIndex`：
+
+```tsx
+<div
+  tabIndex={0}
+  onFocus={() => setActive(true)}
+  onBlur={() => setActive(false)}
+  onKeyDown={(event) => {
+    if (event.key === 'enter') submit()
+  }}
+>
+  Submit
+</div>
+```
+
+| 属性 | 行为 |
+|---|---|
+| `tabIndex={0}` | 加入正常的焦点遍历顺序 |
+| `tabIndex={n}` | 使用 `n` 作为它的 GPUI tab 顺序索引 |
+| `tabIndex={-1}` | 被焦点遍历跳过，但可通过点击或 renderer API 获得焦点 |
+| `autoFocus` | 在它的原生焦点句柄被创建时获取一次焦点 |
+
+## 元素键盘回调
+
+`onKeyDown` 会先为获得焦点的元素触发，然后沿着 GPUI 的焦点派发路径，为声明了 `onKeyDown` 的祖先元素触发。`onKeyUp` 在按键释放时沿着同样的路径触发。添加这两个回调中的任意一个都会创建该元素的原生焦点句柄。
+
+```tsx
+<div
+  autoFocus
+  tabIndex={0}
+  onKeyDown={(event) => {
+    console.log(event.key, event.keyChar, event.modifiers, event.isHeld)
+  }}
+  onKeyUp={(event) => {
+    console.log(`${event.key} released`)
+  }}
+>
+  Focused target
+</div>
+```
+
+GPUI 会在原始键盘回调之前派发匹配的按键动作（key action）。如果一个动作消费了那个键，`onKeyDown` 就不会触发。
+
+## Tab 默认移动焦点
+
+**Tab** 与 **Shift+Tab** 会沿 tab 顺序移动焦点，就像浏览器一样。该默认行为在该按键的每一个 `onKeyDown` 处理器之后运行，因此任何处理器都可以取消它：
+
+```tsx
+<div
+  tabIndex={0}
+  onKeyDown={(event) => {
+    if (event.key !== 'tab') return
+    event.preventDefault() // 这个 Tab 停留在此处
+    insertIndent()
+  }}
+/>
+```
+
+按键事件的工作方式类似于一个冒泡到 `window` 的 DOM 事件：
+
+| 调用 | 效果 |
+|---|---|
+| `event.preventDefault()` | 取消默认行为。Tab 不移动焦点 |
+| `event.stopPropagation()` | 跳过祖先的 `onKeyDown` 与 window 的 `onKeyDown`。默认行为仍然运行 |
+| `event.defaultPrevented` | 当该按键更早的处理器已阻止它时为真 |
+
+```text
+keystroke ► GPUI actions ► element onKeyDown (focused → ancestors) ► render({ onKeyDown }) ► default
+                                   preventDefault() anywhere here cancels ─────────────────────┘
+```
+
+Tab 也永远不会向 `<input>` 或 `<textarea>` 中输入一个 tab 字符，同样与浏览器一致。一个想要输入 tab 的编辑器会调用 `preventDefault()` 并自行插入它。
+
+用 `tabNavigation: false` 为整个窗口关闭该默认行为：
+
+```tsx
+render(<App />, { tabNavigation: false })
+```
+
+<Callout type="note">
+  GPUI 在 JavaScript 运行之前就完成了原生派发，因此这些调用改变的是 GPUIX 接下来的行为。它们无法阻止一个已经消费了该按键的 GPUI 动作。
+</Callout>
+
+## 渲染器键盘回调
+
+把 `onKeyDown` 或 `onKeyUp` 传给 `render()`，即可获得一个窗口级监听器。它会在元素回调之后、针对那些没有被任何 GPUI 动作消费的原始按键触发，并且位于 Tab 默认行为之前。它以 renderer 作为第二个参数：
+
+```tsx
+render(<App />, {
+  onKeyDown(event, renderer) {
+    if (event.key === 'k' && event.modifiers?.cmd) openPalette()
+  },
+})
+```
+
+## 命令式焦点
+
+`focusNext()` 与 `focusPrevious()` 直接映射到 GPUI 的 `window.focus_next()` 与 `window.focus_prev()`。`focusNextWithin(id)` / `focusPreviousWithin(id)` 在该子树内部包裹遍历。`getFocusedElementId()` 返回宿主 id，或 `null`。在 WebGPU 打开期间发出的浏览器焦点请求会被排队，并在首个焦点句柄存在之后应用。如果在那次渲染之前到达了多个请求，以最新的请求为准。
+
+使用 ref 来进行命令式聚焦：
+
+```tsx
+const buttonRef = useRef<{ id: number }>(null)
+
+function focusButton() {
+  if (buttonRef.current) renderer.focusElement(buttonRef.current.id)
+}
+
+<div ref={buttonRef} tabIndex={-1}>Focused on demand</div>
+```
+
+添加 `onKeyDown`、`onKeyUp`、`onFocus` 或 `onBlur` 会创建一个持久的焦点句柄。当元素必须通过焦点遍历可达时，同样要加上 `tabIndex`。移除 `tabIndex` 会把该元素从那个顺序中删除。
+
+## 在自定义面板内捕获 Tab
+
+`Dialog.Popup` 已经做了这件事。对于你自己的面板，请阻止默认的 Tab，然后用 `focusNextWithin` / `focusPreviousWithin` 在其内部包裹遍历。
+
+```tsx
+function onKeyDown(event: KeyEvent) {
+  if (event.key !== 'tab' || !panel) return
+  event.preventDefault()
+  if (event.modifiers?.shift) renderer.focusPreviousWithin?.(panel.id)
+  else renderer.focusNextWithin?.(panel.id)
+}
+
+<div ref={setPanel} onKeyDown={onKeyDown}>
+  <div tabIndex={0} autoFocus>Ok</div>
+  <div tabIndex={0}>Cancel</div>
+</div>
+```
+
+## 焦点样式
+
+GPUIX 的默认行为是：当某个控件拥有键盘焦点时，其余可聚焦元素变暗。你可以用 `focusVisible` 覆盖这一点，详见[支持的样式](/docs/styling#焦点样式)。

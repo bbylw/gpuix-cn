@@ -1,0 +1,78 @@
+---
+title: 示例
+description: todo、chat、timeline、mail、disktree 等示例应用，以及可直接下载运行的独立构建。
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+## 仓库内的示例
+
+| 示例 | 运行 | 展示内容 |
+|---|---|---|
+| **todo** | 在 [`example-app/`](https://github.com/remorses/gpuix/tree/main/example-app) 中执行 `bun run dev` | 起点：单个文件、一个 `<virtual-list>`、一个原生 `<input>`，以及一个带动画的侧边栏 |
+| **blurred window** | `bun run blurred-window` | macOS 磨砂玻璃表面，使用 GPUI 原生的 vibrancy 背景与透明标题栏 |
+| **chat** | `bun --hot chat.tsx` | 一个 GPUIX 应用：透明标题栏、带动画的侧边栏、按线程的对话记录、示例回复、输入框，以及 `<markdown>` |
+| **timeline** | `bun --hot timeline.tsx` | 视频编辑器时间轴：片段拖拽、带吸附的边缘裁剪、播放头拖动、框选、指针下缩放，以及带冻结标尺与轨道列的双轴平移 |
+| **mail** | `bun --hot mail.tsx` | 类 Superhuman 的邮件客户端：三栏布局、线程列表，以及一封 Framer 新闻信 |
+| **disktree** | `npx disktree [dir]`，源码位于 [`disktree/`](https://github.com/remorses/gpuix/tree/main/disktree) | [tobi/disktree](https://github.com/tobi/disktree) 的移植版，已发布到 npm：在 worker 线程上扫描文件夹或整块磁盘，在磨砂窗口上绘制半透明矩形树图，并对可回收空间排序 |
+| **native-text** | `bun --hot native-text.tsx` | 三个原生文本组件，带切换标签页 |
+| **counter** | `bun --hot counter.tsx` | 尽可能小的应用：状态、事件、hover |
+| **diff** | `bun --hot diff.tsx` | 一个用 JS 中的 `<div>` 和 `<text>` 组合而成的 diff 查看器，用于对比 |
+| **web** | 从仓库根目录执行 `bun run web` | 在浏览器 canvas 中用 WebGPU 渲染的 ChatGPT 示例 |
+
+待办应用位于 [`example-app/`](https://github.com/remorses/gpuix/tree/main/example-app)，可以通过 `bunx @gpuix/cli new` 复制。其余示例位于 [`examples/`](https://github.com/remorses/gpuix/tree/main/examples)。
+
+<Callout type="note">
+  那些 `bun --hot` 命令需要克隆本仓库并进行本地原生构建，单靠已发布的包无法运行。
+</Callout>
+
+## 下载独立构建
+
+或者从 [GitHub release](https://github.com/remorses/gpuix/releases) 下载一个独立的 **chat** 构建。无需安装 Bun 或 Rust。
+
+```bash
+tar -xzf example-chat-aarch64-apple-darwin.tar.gz
+./example-chat-aarch64-apple-darwin
+```
+
+压缩包会保留可执行位，因此无需 `chmod` 步骤。macOS 在首次运行时仍可能拦截未签名的二进制文件。请右键点击该文件，选择 **打开** 并确认。
+
+在 Windows 上，下载 `example-chat-x86_64-pc-windows-msvc.exe` 并双击运行。在 Linux 上，文件是 `example-chat-x86_64-unknown-linux-gnu.tar.gz`。
+
+## 浏览器中的 Web 示例
+
+Web 示例打包了与桌面 chat 示例相同的 React 应用与协调器（reconciler）。wasm-bindgen 会把 mutation 与事件回调暴露给既有的 retained tree 和 `GpuixView`，它们运行在 GPUI 的浏览器平台之上。
+
+Web 构建需要 nightly 版 Rust 以及与之匹配的 wasm-bindgen CLI：
+
+```bash
+rustup toolchain install nightly --component rust-src --target wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version 0.2.127 --locked
+bun run web
+```
+
+生成的 Wasm 使用了共享内存，因此页面必须是跨源隔离（cross-origin isolated）的。生产服务器必须在**顶层文档**上发送以下响应头：
+
+```http
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+`require-corp` 进而会约束**跨源**子资源，这些子资源必须自己提供 CORS 或 `Cross-Origin-Resource-Policy`。只要把 JavaScript 与 Wasm 和文档放在同一源下，就无需其他操作。
+
+`bun run web` 只有在 `packages/native/wasm` 缺失时才会重新构建 Wasm。在修改了 Rust 代码后，可以强制重建：
+
+```bash
+bun scripts/web.ts --rebuild
+```
+
+### 浏览器中的热重载
+
+`bun run web` 通过 Bun 的前端开发服务器来提供示例，因此对 `examples/chat.tsx` 的修改会以一次 **React Fast Refresh** 更新的形式到达。组件会就地替换，且 `useState` 得以保留，这意味着输入框文本、侧边栏选中项以及滚动位置都会保持在原处。GPUI 的 canvas 绝不会被重建，约 19 MB 的 Wasm 模块也绝不会被重新拉取。
+
+Fast Refresh 只适用于「所有导出都是组件」的模块。如果修改的是其他内容（例如入口文件），Bun 会改为重载页面。两条路径都正确，只是重载会慢一些。
+
+Wasm 这半部分是**单例，绝不能重复求值**。`WebGpuixRenderer::init` 在其 thread-local 应用已经存在时会以 `GPUIX web is already running` 报错，而 GPUI 的浏览器平台会把自己的 canvas 追加到 `<body>`。保护它的关键并不在于它身处 `node_modules` 中 —— Bun 会把它和你的应用打包进同一个客户端注册表。关键在于 Bun 只会重新运行**改动过的**模块，然后沿其导入者向上回溯，因此未改动的依赖会保持已求值且被缓存。由此得出两条规则：
+
+- 不要在入口文件中调用 `import.meta.hot.accept("./your-app", ...)`。Bun 哪怕在被导入模块已经自行接受（self-accepted）时，也会运行导入者的依赖接受回调，于是该回调会在一次成功的刷新之上再次挂载组件树，并丢弃所有 `useState`。
+- 把 `@gpuix/native` 的导入放在一个「永远不会成为 Refresh 边界、也绝不被显式接受」的模块里。

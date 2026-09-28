@@ -1,0 +1,334 @@
+---
+title: 无样式控件
+description: 'Button、Select、Combobox、Tooltip、Dialog 的部件表、浮层绘制顺序与层栈规则。'
+eyebrow: 组件
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+内置的控件是**无样式的原语（primitive）**，而非一套固定的组件库。请像在 shadcn 中使用 Radix 原语那样使用它们：导入一个原语命名空间，在本地文件中包装并加上样式，然后在应用的各处导入这些本地组件。
+
+```text
+@gpuix/react/select ► components/ui/select.tsx ► application screens
+  native behavior       local styles/variants       product-specific use
+```
+
+每个原语都有一个专用的命名空间入口：
+
+| 导入 | 主要组成部分 |
+|---|---|
+| `@gpuix/react/button` | `Button`、`buttonProps` |
+| `@gpuix/react/select` | `Root`、`Trigger`、`Value`、`Content`、`Item` |
+| `@gpuix/react/combobox` | `Root`、`Input`、`Content`、`List`、`Item`、`Empty` |
+| `@gpuix/react/tooltip` | `Provider`、`Root`、`Trigger`、`Content` |
+| `@gpuix/react/dialog` | `Root`、`Trigger`、`Portal`、`Backdrop`、`Popup`、`Title`、`Description`、`Close` |
+| `@gpuix/react/floating` | `FloatingLayer`、`renderSlot` |
+
+## 构建一个本地 Select
+
+创建 `components/ui/select.tsx`。这是应用代码，因此无需等待 GPUIX 增加主题选项，就可以直接复制并修改它：
+
+```tsx
+import * as React from 'react'
+import * as SelectPrimitive from '@gpuix/react/select'
+
+export const Select = SelectPrimitive.Root
+export const SelectValue = SelectPrimitive.Value
+export const SelectGroup = SelectPrimitive.Group
+
+export const SelectTrigger = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Trigger>,
+  SelectPrimitive.SelectTriggerProps
+>(({ style, ...props }, ref) => (
+  <SelectPrimitive.Trigger
+    ref={ref}
+    {...props}
+    style={(state) => ({
+      width: 220,
+      height: 36,
+      padding: 8,
+      backgroundColor: state.open ? '#334155' : '#1e293b',
+      borderRadius: 8,
+      ...(typeof style === 'function' ? style(state) : style),
+    })}
+  />
+))
+
+export const SelectContent = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Content>,
+  SelectPrimitive.SelectContentProps
+>(({ style, ...props }, ref) => (
+  <SelectPrimitive.Content
+    ref={ref}
+    sideOffset={6}
+    {...props}
+    style={{
+      width: 220,
+      maxHeight: 240,
+      overflowY: 'scroll',
+      padding: 4,
+      backgroundColor: '#0f172a',
+      borderRadius: 8,
+      ...style,
+    }}
+  />
+))
+
+export const SelectItem = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Item>,
+  SelectPrimitive.SelectItemProps
+>(({ style, ...props }, ref) => (
+  <SelectPrimitive.Item
+    ref={ref}
+    {...props}
+    style={(state) => ({
+      padding: 8,
+      opacity: state.disabled ? 0.4 : 1,
+      backgroundColor: state.highlighted
+        ? '#334155'
+        : state.selected
+          ? '#1e3a5f'
+          : '#0f172a',
+      ...(typeof style === 'function' ? style(state) : style),
+    })}
+  />
+))
+```
+
+当 `SelectValue` 需要在菜单关闭时显示一个标签时，在 `Root` 上传入 **`items`**。键盘导航会读取已挂载的 `SelectItem` 子元素。在 `Item` 外面包一层带样式的包装组件没有问题。若不传 `items`，`SelectValue` 显示的是原始取值。
+
+```tsx
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './components/ui/select'
+
+const models = [
+  { value: 'sonnet', label: 'Sonnet' },
+  { value: 'opus', label: 'Opus' },
+]
+
+<Select items={models} value={model} onValueChange={setModel}>
+  <SelectTrigger>
+    <SelectValue placeholder="Select a model" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectGroup>
+      {models.map((item) => (
+        <SelectItem key={item.value} value={item.value}>
+          {item.label}
+        </SelectItem>
+      ))}
+    </SelectGroup>
+  </SelectContent>
+</Select>
+```
+
+触发器是一个 tab 停靠点（即便使用 `asChild` 时也是如此），除非该部件或其子元素设置了自身的 `tabIndex`。打开 Select 会让其内容获得焦点。`Up`、`Down`、`Ctrl+P`、`Ctrl+N`、`Enter` 与 `Escape` 控制菜单。Escape 会经过[层栈](#escape-关闭顶层)。弹层是模态的，类似于 Base UI：Tab 不会离开它。通过键盘或一次选择来关闭时，会把焦点恢复到触发器上。在外部按下则关闭它，并把焦点留在按下动作放置的位置。被禁用的项会被跳过。
+
+<Callout type="important" title="GPUI 不会冒泡点击">
+  当一个带样式的行负责绘制项的填充时，请使用 `asChild`，让那一行成为真正的命中目标：
+
+  ```tsx
+  <SelectItem value="opus" asChild>
+    <MenuRow>Claude Opus 4.6</MenuRow>
+  </SelectItem>
+  ```
+
+  子元素必须转发它的 ref 与宿主 props。`ComboboxItem` 支持同样的模式。
+</Callout>
+
+## 为 Combobox 与 Tooltip 加样式
+
+也请从命名空间导入开始它们的本地文件：
+
+```tsx
+// components/ui/combobox.tsx
+import * as ComboboxPrimitive from '@gpuix/react/combobox'
+
+// components/ui/tooltip.tsx
+import * as TooltipPrimitive from '@gpuix/react/tooltip'
+```
+
+应用仍然使用复合组件（compound components），而非一个大配置对象：
+
+```tsx
+<ComboboxPrimitive.Root items={['Next.js', 'SvelteKit', 'Astro']}>
+  <ComboboxPrimitive.Input style={{ width: 220, height: 36, padding: 8 }} />
+  <ComboboxPrimitive.Content style={{ width: 220 }}>
+    <ComboboxPrimitive.Empty>No frameworks found.</ComboboxPrimitive.Empty>
+    <ComboboxPrimitive.List>
+      {(item) => (
+        <ComboboxPrimitive.Item key={item} value={item}>
+          {item}
+        </ComboboxPrimitive.Item>
+      )}
+    </ComboboxPrimitive.List>
+  </ComboboxPrimitive.Content>
+</ComboboxPrimitive.Root>
+```
+
+```tsx
+<TooltipPrimitive.Provider delayDuration={350}>
+  <TooltipPrimitive.Root>
+    <TooltipPrimitive.Trigger asChild>
+      <div tabIndex={0} style={{ padding: 8 }}>Copy</div>
+    </TooltipPrimitive.Trigger>
+    <TooltipPrimitive.Content side="top" sideOffset={6}>
+      Copy message
+    </TooltipPrimitive.Content>
+  </TooltipPrimitive.Root>
+</TooltipPrimitive.Provider>
+```
+
+Combobox 使用原生 input 来进行文本编辑、IME、剪贴板与焦点。焦点离开 input 会关闭弹层，因此一个移动焦点的 Tab 会将其关闭，而被阻止的 Tab 则保持它打开。Combobox 与 Tooltip 的触发器都像 Select 触发器一样是 tab 停靠点。Tooltip 的 `asChild` 会保留子元素的 ref，并把触发器行为合并进那个宿主元素。子元素自身的处理器会先运行。
+
+所有浮动内容都使用 GPUI 延迟的 `anchored()` 层，吸附在窗口内部，并遮挡其背后的控件。
+
+## 浮层菜单
+
+菜单、tooltip 与对话框必须使用 `SelectContent`、`ComboboxContent` 或 `<anchored deferred>`。它们会在后续的绘制 pass 中，绘制在 `<virtual-list>` 以及页面其余部分之上。
+
+一个 `position: "absolute"` 的卡片如果溢出到输入框之外，会位于虚拟列表**之下**。列表在输入框之后绘制，因此你会透过菜单看到 markdown，而点击会命中它背后的文本。
+
+```tsx
+<Select items={[{ value: 'flash', label: 'DeepSeek V4 Flash' }]} value={model} onValueChange={setModel}>
+  <div style={{ position: 'relative' }}>
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent side="top" sideOffset={4} style={{ backgroundColor: '#232323' }}>
+      <SelectItem value="flash">DeepSeek V4 Flash</SelectItem>
+    </SelectContent>
+  </div>
+</Select>
+```
+
+<Callout type="important" title="给每一个浮层一个不透明的填充">
+  使用 `#232323`，而不是 `#23232399`。`FloatingLayer` 默认是 `#1A1A1A`。项的行应使用同样的纯色，或一个纯色的 hover 颜色。在磨砂窗口上一个 `#00000000` 的子元素会穿透 Metal 直达桌面。
+
+  一个没有在 style 中指定填充的原始 `<anchored>` 会绘制成 `#1A1A1A`。设置 `backgroundColor: "transparent"` 则什么都不绘制，就像 `Dialog.Portal` 那样。
+</Callout>
+
+`fill="window"` 会让一个 `<anchored>` 覆盖整个窗口，类似于 `Dialog.Portal`。原生层每一帧都会读取视口尺寸，因此该层会在同一帧内跟随窗口缩放。它会忽略 `position`、`side`、`align`、`anchor`、`offset` 与 `fit`。
+
+```tsx
+<anchored fill="window" style={{ backgroundColor: 'transparent' }}>
+  <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+</anchored>
+```
+
+`FloatingLayer` 会把统一的圆角与每个角的圆角复制到它的 anchored 表面上，因此圆角的 Select、Combobox 与 Tooltip 内容不会在它背后露出方角。它还会把 `visibility` 与 `opacity` 放在那个外层表面上，让兜底的填充跟随它们，而不会让嵌套的透明度相乘。`pointerEvents: "none"` 会禁用 anchored 遮挡层。背景、边框、阴影、溢出与布局仍然留在内层内容上，以避免重复绘制或改变弹层几何。
+
+## 测量一个元素
+
+`getElementBounds(id)` 返回最后一次绘制的盒子，如果该节点没有绘制则返回 `null`。它在实时的 `GpuixRenderer` 与测试渲染器上都可以工作。边界是在**绘制（paint）**期间记录的，因此应在某一帧之后读取，而不是在挂载的那次提交中读取。
+
+```tsx
+const box = renderer.getElementBounds?.(ref.current.id)
+// { x, y, width, height }
+```
+
+## Button
+
+GPUIX 没有原生的 `<button>`，因此一个带 `onClick` 的 `div` 既无法用 Tab 到达，也会忽略键盘。`Button` 就是 [Base UI Button](https://base-ui.com/react/components/button)：
+
+```tsx
+import { Button } from '@gpuix/react/button'
+
+<Button onClick={save} disabled={saving} style={(state) => ({ opacity: state.disabled ? 0.5 : 1 })}>
+  Save
+</Button>
+```
+
+| 行为 | 细节 |
+|---|---|
+| Tab 停靠点 | `tabIndex` 0，`role="button"` |
+| `onClick` | 按下触发，按下 **Enter**（不重复触发）时触发，**Space** 在抬起时触发 |
+| `disabled` | 没有 `onClick`，离开 Tab 顺序 |
+| `focusableWhenDisabled` | 在禁用时仍留在 Tab 顺序中，用于一个繁忙的「Saving…」按钮 |
+| `asChild` | 把行为合并进你自己的元素 |
+| `style` | 对象，或一个以 `{ disabled }` 为参数的函数 |
+
+`buttonProps(behavior)` 为你的自定义部件返回同样的 props。`Dialog.Trigger` 与 `Dialog.Close` 都构建在它之上。
+
+## Dialog
+
+部件与 [Base UI Dialog](https://base-ui.com/react/components/dialog) 相同：
+
+```tsx
+import * as Dialog from '@gpuix/react/dialog'
+
+<Dialog.Root>
+  <Dialog.Trigger>Settings</Dialog.Trigger>
+  <Dialog.Portal>
+    <Dialog.Backdrop style={{ backgroundColor: '#00000080' }} />
+    <Dialog.Popup style={{ width: 420, padding: 16, backgroundColor: '#232323' }}>
+      <Dialog.Title>Settings</Dialog.Title>
+      <Dialog.Close>Done</Dialog.Close>
+    </Dialog.Popup>
+  </Dialog.Portal>
+</Dialog.Root>
+```
+
+| 部件 | 行为 |
+|---|---|
+| `Root` | `open`、`defaultOpen`、`onOpenChange`、`modal`（默认 `true`）、`disablePointerDismissal` |
+| `Trigger` | Tab 停靠点。点击、Enter 或 Space 打开 |
+| `Portal` | 全窗口延迟层（`<anchored fill="window">`）。在同一帧内跟随窗口缩放。绘制在 `<virtual-list>` 之上。默认将其子元素居中。模态：阻止其背后点击与滚轮 |
+| `Backdrop` | 按下关闭对话框 |
+| `Popup` | 打开时把焦点移入，关闭时移出。模态：Tab 与 Shift+Tab 留在内部 |
+| `Close` | Tab 停靠点。点击、Enter 或 Space 关闭 |
+
+Popup 上的 `initialFocus` 与 `finalFocus` 决定焦点去向，就像 Base UI：
+
+```tsx
+<Dialog.Popup initialFocus={searchRef} finalFocus={composerRef}>
+```
+
+| 取值 | `initialFocus`（打开时） | `finalFocus`（关闭时） |
+|---|---|---|
+| 未设置 / `true` | Popup 自身，因此第一次 Tab 会进入它 | 触发器，否则是 Popup 打开时获得焦点的元素 |
+| ref 或元素 | 那个元素 | 那个元素 |
+| `false` | 焦点保持不变 | 焦点保持不变 |
+| 函数 | 返回上述之一。`null` 表示使用默认值 | 同上 |
+
+`initialFocus` 的默认值与 Base UI 不同，后者会选择第一个可 tab 的元素。GPUI 的 tab 顺序只有在 Popup 已经绘制之后才存在，因此 GPUIX 会聚焦 Popup，并让第一次 Tab 去遍历那个顺序。
+
+一个从应用状态打开、没有 `Trigger` 的对话框仍然会归还焦点：Popup 会在它挂载之前记录下获得焦点的元素。
+
+`initialFocus` 会胜过 Popup 内部的 `autoFocus`。请把该字段作为 `initialFocus` 传入。
+
+嵌套的对话框遵循层栈。当两者在一次更新中同时打开时，内部的那个获得焦点。当两者在一次更新中同时关闭时，焦点会回到外层对话框的返回目标。Popup 内部的 Select 或 Tooltip 会打开在它之上，并且 Escape 会先关闭它。
+
+## Escape 关闭顶层
+
+每一个打开的 Dialog Popup、Select、Combobox 与 Tooltip 都位于每个窗口的同一个**层栈（layer stack）** 上。Escape 只关闭最近打开的那一层，即便没有任何元素获得焦点。它是一个默认动作，就像 Tab，因此任何 `onKeyDown` 都可以让它保持打开：
+
+```tsx
+<Dialog.Popup
+  onKeyDown={(event) => {
+    if (event.key === 'escape' && dirty) event.preventDefault()
+  }}
+/>
+```
+
+一个自定义浮层通过 `DismissableLayer` 加入同一个栈。只在浮层打开期间挂载它：
+
+```tsx
+import { DismissableLayer } from '@gpuix/react' // 或 '@gpuix/solid'
+
+{open && (
+  <DismissableLayer onEscapeKeyDown={() => setOpen(false)}>
+    <anchored deferred>{/* overlay */}</anchored>
+  </DismissableLayer>
+)}
+```
+
+一个挂载在另一个内部的层永远位于其上方，即便两者在同一次提交中打开。`DismissableLayer` 也接受 `initialFocus()` 与 `finalFocus(previous)`，它们返回一个元素 id 或 `null`。栈会按栈的顺序调用它们，因此在打开时只有顶层会获得焦点。
+
+与框架无关的代码使用 `pushDismissLayer(renderer, layer, { previousFocus })`（带一个 `parent` 字段），并在该层关闭时调用返回的函数。

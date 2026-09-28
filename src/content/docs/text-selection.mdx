@@ -1,0 +1,46 @@
+---
+title: 文本选区
+description: '跨元素选区如何工作、如何读取与响应，以及如何用 userSelect 关掉不需要的地方。'
+eyebrow: 文本能力
+---
+
+import Callout from '../../components/mdx/Callout.astro'
+
+GPUIX 绘制的每一段文本都是**可选中、可复制的**，包括位于 `<code>`、`<diff>` 与 `<markdown>` 内部的文本。一次从标题开始、在围栏代码块内结束的拖拽，会选中它们之间的所有内容；Cmd+C 会按文档顺序把它们拼接后复制。
+
+这里没有任何需要开启的选项。轻点不会选中，只有拖拽才会。若要*关闭*——例如工具栏、按钮、行号槽——请设置 `userSelect: "none"`，它会像对应的 CSS 属性一样被继承：
+
+```tsx
+<div style={{ userSelect: 'none' }}>
+  <text>toolbar label, never selected</text>
+</div>
+```
+
+## 读取与响应选区
+
+```tsx
+render(<App />, {
+  onSelectionChange(event) {
+    setCopied(event.value ?? '')
+  },
+})
+
+renderer.getSelectedText()   // 拼接后的文本，或 null
+renderer.clearSelection()
+```
+
+`onSelectionChange` 是 `render()` / `createRoot()` 上的一个**窗口级**回调，挂载方式与 `onKeyDown` 相同。文本选区是应用级的，而非逐元素的。它会在选中的范围发生变化时触发一次，包括清空到空（此时 `value` 被省略）。未发生变化的帧不会触发。
+
+载荷是一个普通的 `EventPayload`。`value` 是拼接后的选中文本。
+
+## 它是怎么工作的
+
+选区之所以能工作，是因为每一个被绘制的文本元素都会以**绘制顺序**（即文档顺序）注册进一个逐帧的注册表。一次锚定在某个元素中的拖拽会针对该注册表解析为逐元素的跨度：锚点与末端处是部分选中，中间的全部整段选中。
+
+<Callout type="note" title="为什么不采用像 Zed 那样的一个大文本元素？">
+  Zed 的 markdown 之所以能连续选中，是因为它的整个文档是位于单一文本模型之上的单个元素。GPUIX 渲染的是一个文本元素的*树*，因此它改为在绘制时重建这种连续性。该机制移植自 [Comet](https://github.com/zeronsh/comet)（MIT 许可），它曾面临同样的问题。
+</Callout>
+
+<Callout type="important" title="userSelect: none 并不退出搜索">
+  浏览器仍然能找到那段文本，因此 GPUIX 仍然会高亮它。只有元素自身的装饰（chrome）、代码行号槽或 diff 文件头会被排除。详见[高亮与搜索](/docs/highlight-search)。
+</Callout>
