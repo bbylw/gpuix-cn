@@ -12,7 +12,7 @@
 
 ### 三行命令
 
-通过官方示例创建一个应用。该命令只会下载 `example-app/` 并安装它的依赖。无需克隆仓库、原生构建或安装 Rust 工具链。
+通过官方示例创建一个应用。该命令只会下载 [`example-app/`](https://github.com/remorses/gpuix/tree/main/example-app) 并安装它的依赖。无需克隆仓库、原生构建或安装 Rust 工具链。
 
 ```bash
 bunx @gpuix/cli new my-app
@@ -464,7 +464,7 @@ bun scripts/web.ts --rebuild
 
 #### 浏览器中的热重载
 
-`bun run web` 通过 Bun 的前端开发服务器来提供示例，因此对 `examples/chat.tsx` 的修改会以一次 **React Fast Refresh** 更新的形式到达。组件会就地替换，且 `useState` 得以保留，这意味着输入框文本、侧边栏选中项以及滚动位置都会保持在原处。GPUI 的 canvas 绝不会被重建，约 19 MB 的 Wasm 模块也绝不会被重新拉取。
+`bun run web` 通过 Bun 的前端开发服务器来提供示例，因此对 [`examples/chat.tsx`](https://github.com/remorses/gpuix/blob/main/examples/chat.tsx) 的修改会以一次 **React Fast Refresh** 更新的形式到达。组件会就地替换，且 `useState` 得以保留，这意味着输入框文本、侧边栏选中项以及滚动位置都会保持在原处。GPUI 的 canvas 绝不会被重建，约 19 MB 的 Wasm 模块也绝不会被重新拉取。
 
 Fast Refresh 只适用于「所有导出都是组件」的模块。如果修改的是其他内容（例如入口文件），Bun 会改为重载页面。两条路径都正确，只是重载会慢一些。
 
@@ -995,7 +995,7 @@ renderer.getDebugFrameOverlayStats()
 
 ## 性能回归测试
 
-chat 示例为此提供了一个回归测试：`examples/chat.perf.test.tsx`。它对挂载、滚轮绘制与侧边栏点击计时。它断言的是 p95，而非每一帧。
+chat 示例为此提供了一个回归测试：[`examples/chat.perf.test.tsx`](https://github.com/remorses/gpuix/blob/main/examples/chat.perf.test.tsx)。它对挂载、滚轮绘制与侧边栏点击计时。它断言的是 p95，而非每一帧。
 
 默认的示例套件排除了这个硬件计时测试，以免共享 CI runner 的方差导致功能检查失败。请在目标 Mac 上显式运行它。
 
@@ -1529,7 +1529,7 @@ renderer.scrollToItem(listId, index, offsetInItem)  // 偏移单位为 px，可�
 renderer.getListScrollTop(listId)  // [itemIndex, offsetInItemPx, viewportHeightPx] 或 null
 ```
 
-**负的偏移会把视口顶部锚定在行的上方**，下一次布局会用真实的测量高度来解析它。这正是无限滚动历史所需的工具：当读者停留在一个加载行时，读取 `getListScrollTop`，提交已获取的分页，然后用一个负偏移重新锚定到原本位于加载行下方的那条消息上。在新行于其上方完成测量期间，该消息会停留在相同的像素位置 —— 具体可参考 `examples/infinite-chat.tsx` 这个完整示例。
+**负的偏移会把视口顶部锚定在行的上方**，下一次布局会用真实的测量高度来解析它。这正是无限滚动历史所需的工具：当读者停留在一个加载行时，读取 `getListScrollTop`，提交已获取的分页，然后用一个负偏移重新锚定到原本位于加载行下方的那条消息上。在新行于其上方完成测量期间，该消息会停留在相同的像素位置 —— 具体可参考 [`examples/infinite-chat.tsx`](https://github.com/remorses/gpuix/blob/main/examples/infinite-chat.tsx) 这个完整示例。
 
 一个等于条目总数的 `itemIndex` 是 gpui 的**末尾哨兵（at-end sentinel）**：一个 resting 在最末端、底端对齐的列表。停留在尾部加载行的读者通常就位于此处，而同一元组中的视口高度正是把它转换为相对于尾部各行的位置的东西（示例中为 `EDGE_HEIGHT - viewportHeight`）。
 
@@ -3344,7 +3344,7 @@ expect(readout).toBe('x=140 y=60 zoom=24 sel=clip-7')
 
 ## 截图落盘位置
 
-截图落在 `packages/react/screenshots/` 与 `examples/screenshots/`，两者都在 gitignore 中，因此可在运行后检查，而不会给每次提交增加一个二进制 diff。README 引用的精选图集位于 `docs/images/`，可用以下命令重新生成：
+截图落在 `packages/react/screenshots/` 与 `examples/screenshots/`，两者都在 gitignore 中，因此可在运行后检查，而不会给每次提交增加一个二进制 diff。README 引用的精选图集位于 [`docs/images/`](https://github.com/remorses/gpuix/tree/main/docs/images)，可用以下命令重新生成：
 
 ```bash
 bun scripts/screenshots.ts
@@ -3369,7 +3369,7 @@ JS 重挂载已在[热重载](#热重载)里讲过。原生那一半**没有热�
 | `bun run build:debug` (napi) | ~2s |
 | 单个 vitest 截图文件 | ~2s |
 
-`bun run dev` 把这套流程串成一个循环：它监视 `packages/native/src`，重新编译并重渲染截图测试。**从改动 Rust 到生成新 PNG 大约 4 秒。**
+`bun run dev` 把这套流程串成一个循环：它监视 [`packages/native/src`](https://github.com/remorses/gpuix/tree/main/packages/native/src)，重新编译并重渲染截图测试。**从改动 Rust 到生成新 PNG 大约 4 秒。**
 
 ```bash
 bun run dev                      # rebuild, re-render the showcase screenshots
